@@ -251,6 +251,7 @@ export default function App() {
   const [settings, setSettings]   = useState(() => Store.getSettings());
   const [rules, setRules]         = useState(() => Store.getRules());
   const [syncStatus, setSyncStatus] = useState(Sync.status);
+  const [openTradeId, setOpenTradeId] = useState(null);
 
   useEffect(() => {
     document.body.className = theme === 'light' ? 'light' : '';
@@ -297,6 +298,17 @@ export default function App() {
     };
     window.addEventListener('keydown', fn);
     return () => window.removeEventListener('keydown', fn);
+  }, []);
+
+  useEffect(() => {
+    const fn = (e) => {
+      const id = e.detail?.id;
+      if (!id) return;
+      setPage('journal');
+      setOpenTradeId(id);
+    };
+    window.addEventListener('tl:openTrade', fn);
+    return () => window.removeEventListener('tl:openTrade', fn);
   }, []);
 
   const paletteItems = useMemo(() => [
@@ -436,13 +448,20 @@ export default function App() {
 
         <div className="main-content page-transition" key={page}>
           {page === 'dashboard'   && <Dashboard onNav={setPage}/>}
-          {page === 'journal'     && <Journal rules={rules} settings={settings}/>}
+          {page === 'journal'     && (
+            <Journal
+              rules={rules}
+              settings={settings}
+              openTradeId={openTradeId}
+              onOpenHandled={() => setOpenTradeId(null)}
+            />
+          )}
           {page === 'rules'       && <Rules/>}
           {page === 'setups'      && <Setups/>}
           {page === 'performance' && <Performance/>}
           {page === 'calendar'    && (
             <div className="card">
-              <CalendarView byDay={calcStats(Store.getTrades())?.byDay || {}}/>
+              <CalendarView byDay={calcStats(Store.getTrades())?.byDay || {}} trades={Store.getTrades()}/>
             </div>
           )}
         </div>

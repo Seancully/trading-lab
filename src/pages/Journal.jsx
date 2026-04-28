@@ -379,7 +379,7 @@ function OutlookUpload({ label, url, onChange }) {
   );
 }
 
-export default function Journal({ rules, settings }) {
+export default function Journal({ rules, settings, openTradeId, onOpenHandled }) {
   const [trades, setTrades] = useState(() => Store.getTrades());
   const [selected, setSelected] = useState(null);
   const [adding, setAdding] = useState(false);
@@ -392,6 +392,15 @@ export default function Journal({ rules, settings }) {
     window.addEventListener('tl:newTrade', fn);
     return () => window.removeEventListener('tl:newTrade', fn);
   }, []);
+
+  useEffect(() => {
+    if (!openTradeId) return;
+    const trade = trades.find(t => t.id === openTradeId);
+    if (trade) {
+      setSelected(trade);
+      if (onOpenHandled) onOpenHandled();
+    }
+  }, [openTradeId, trades, onOpenHandled]);
 
   const handleSave = (trade) => {
     setTrades(Store.saveTrade(trade));

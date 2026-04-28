@@ -10,6 +10,10 @@ const BLOCK_TYPES = [
   { type: 'li',   icon: '•',    label: 'Bullet',    desc: 'Bullet list item' },
   { type: 'num',  icon: '1.',   label: 'Numbered',  desc: 'Numbered list' },
   { type: 'bq',   icon: '"',    label: 'Callout',   desc: 'Highlighted note' },
+  { type: 'hl',   icon: 'Hi',   label: 'Highlight', desc: 'Soft highlight block' },
+  { type: 'accent', icon: 'A',  label: 'Accent',    desc: 'Accent color text' },
+  { type: 'success', icon: 'OK', label: 'Success',  desc: 'Green emphasis' },
+  { type: 'danger', icon: '!',  label: 'Warning',   desc: 'Red emphasis' },
   { type: 'code', icon: '</>',  label: 'Code',      desc: 'Code block' },
   { type: 'hr',   icon: '—',    label: 'Divider',   desc: 'Horizontal rule' },
   { type: 'img',  icon: '🖼',   label: 'Image',     desc: 'Upload image' },
@@ -32,6 +36,13 @@ function getBlockStyle(type) {
     case 'h3':   return { ...base, fontSize: 16, fontWeight: 600, lineHeight: 1.4, padding: '2px 0' };
     case 'bq':   return { ...base, fontSize: 13, fontStyle: 'italic', color: 'var(--text2)', padding: '10px 14px',
       background: 'var(--surface2)', borderLeft: '3px solid var(--accent)', borderRadius: '0 6px 6px 0' };
+    case 'hl':   return { ...base, fontSize: 13, background: 'var(--accentDim)', border: '1px solid var(--accentBorder)',
+      padding: '6px 10px', borderRadius: 6 };
+    case 'accent': return { ...base, fontSize: 14, color: 'var(--accent)', fontWeight: 600 };
+    case 'success': return { ...base, fontSize: 13, background: 'var(--bullDim)', border: '1px solid rgba(34,197,94,0.25)',
+      padding: '6px 10px', borderRadius: 6, color: 'var(--bull)', fontWeight: 600 };
+    case 'danger': return { ...base, fontSize: 13, background: 'var(--bearDim)', border: '1px solid rgba(239,68,68,0.25)',
+      padding: '6px 10px', borderRadius: 6, color: 'var(--bear)', fontWeight: 600 };
     case 'code': return { ...base, fontFamily: 'var(--mono)', fontSize: 12,
       background: 'var(--surface2)', border: '1px solid var(--border2)',
       padding: '10px 14px', borderRadius: 6, color: 'var(--accent)', whiteSpace: 'pre-wrap' };
@@ -39,7 +50,7 @@ function getBlockStyle(type) {
   }
 }
 
-const Block = React.forwardRef(function Block({ block, idx, onInput, onKeyDown, onImageUpload }, ref) {
+const Block = React.forwardRef(function Block({ block, idx, onInput, onKeyDown, onImageUpload, isFocused, onFocus, onBlur }, ref) {
   const fileRef = useRef();
 
   if (block.type === 'hr') {
@@ -55,9 +66,9 @@ const Block = React.forwardRef(function Block({ block, idx, onInput, onKeyDown, 
           <div>
             <img src={block.imageUrl} alt="" style={{ maxWidth: '100%', borderRadius: 8, border: '1px solid var(--border)', display: 'block' }}/>
             <div ref={ref} contentEditable suppressContentEditableWarning
-              data-placeholder="Caption..." onInput={onInput}
+              data-placeholder={isFocused ? 'Caption...' : ''} onInput={onInput}
               style={{ fontSize: 12, color: 'var(--text3)', marginTop: 6, outline: 'none', fontStyle: 'italic', minHeight: '1.4em' }}
-              onKeyDown={onKeyDown}
+              onKeyDown={onKeyDown} onFocus={onFocus} onBlur={onBlur}
               dangerouslySetInnerHTML={{ __html: block.text || '' }}
             />
           </div>
@@ -79,6 +90,12 @@ const Block = React.forwardRef(function Block({ block, idx, onInput, onKeyDown, 
     ? <span style={{ color: 'var(--text3)', marginRight: 8, fontFamily: 'var(--mono)', fontSize: 12, userSelect: 'none', flexShrink: 0, lineHeight: '1.8', minWidth: 18 }}>{idx + 1}.</span>
     : null;
 
+  const placeholder = isFocused
+    ? (block.type === 'h1' ? 'Heading 1' : block.type === 'h2' ? 'Heading 2' :
+      block.type === 'h3' ? 'Heading 3' : block.type === 'bq' ? 'Callout...' :
+      block.type === 'code' ? 'Code...' : "Type '/' for commands")
+    : '';
+
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', margin: '1px 0' }}>
       {prefix}
@@ -86,14 +103,12 @@ const Block = React.forwardRef(function Block({ block, idx, onInput, onKeyDown, 
         ref={ref}
         contentEditable
         suppressContentEditableWarning
-        data-placeholder={
-          block.type === 'h1' ? 'Heading 1' : block.type === 'h2' ? 'Heading 2' :
-          block.type === 'h3' ? 'Heading 3' : block.type === 'bq' ? 'Callout…' :
-          block.type === 'code' ? 'Code…' : "Type  '/'  for commands"
-        }
+        data-placeholder={placeholder}
         style={{ ...getBlockStyle(block.type), flex: 1 }}
         onInput={onInput}
         onKeyDown={onKeyDown}
+        onFocus={onFocus}
+        onBlur={onBlur}
         dangerouslySetInnerHTML={{ __html: block.text || '' }}
       />
     </div>
@@ -102,11 +117,22 @@ const Block = React.forwardRef(function Block({ block, idx, onInput, onKeyDown, 
 
 function SlashMenu({ pos, query, onSelect, onClose }) {
   const [sel, setSel] = useState(0);
-  const filtered = BLOCK_TYPES.filter(t => !query || t.label.toLowerCase().startsWith(query.toLowerCase()));
+  const itemRefs = useRef([]);
+  const filtered = BLOCK_TYPES.filter(t => {
+    if (!query) return true;
+    const q = query.toLowerCase();
+    return t.label.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q) || t.type.toLowerCase().includes(q);
+  });
 
   useEffect(() => { setSel(0); }, [query]);
 
   useEffect(() => {
+    const el = itemRefs.current[sel];
+    if (el) el.scrollIntoView({ block: 'nearest' });
+  }, [sel, filtered.length]);
+
+  useEffect(() => {
+    if (!filtered.length) return;
     const fn = (e) => {
       if (!['ArrowDown','ArrowUp','Enter','Escape'].includes(e.key)) return;
       e.preventDefault(); e.stopPropagation();
@@ -121,10 +147,13 @@ function SlashMenu({ pos, query, onSelect, onClose }) {
 
   if (!filtered.length) return null;
 
+  const left = Math.min(pos.x, window.innerWidth - 260);
+  const top = Math.max(8, Math.min(pos.y + 4, window.innerHeight - 320));
+
   return (
-    <div className="slash-menu" style={{ position: 'fixed', top: pos.y + 4, left: Math.min(pos.x, window.innerWidth - 240), zIndex: 300 }}>
+    <div className="slash-menu" style={{ position: 'fixed', top, left, zIndex: 300 }}>
       {filtered.map((t, i) => (
-        <div key={t.type} className={`slash-menu-item ${i === sel ? 'selected' : ''}`}
+        <div key={t.type} ref={el => { itemRefs.current[i] = el; }} className={`slash-menu-item ${i === sel ? 'selected' : ''}`}
           onMouseEnter={() => setSel(i)}
           onMouseDown={e => { e.preventDefault(); onSelect(t.type); }}>
           <div className="slash-menu-icon">{t.icon}</div>
@@ -147,6 +176,8 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
   );
   const [newTag, setNewTag] = useState('');
   const [slash,  setSlash]  = useState(null);
+  const [focusedId, setFocusedId] = useState(null);
+  const [titleFocused, setTitleFocused] = useState(false);
   const blockRefs  = useRef({});
   const saveTimer  = useRef(null);
 
@@ -288,11 +319,13 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
 
         <div
           contentEditable suppressContentEditableWarning
-          data-placeholder="Untitled"
+          data-placeholder={titleFocused ? 'Untitled' : ''}
           style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-0.025em', outline: 'none',
             color: 'var(--text)', lineHeight: 1.2, marginBottom: 14,
             minHeight: '1.2em', display: 'block' }}
           onInput={e => setTitle(e.target.innerText || '')}
+          onFocus={() => setTitleFocused(true)}
+          onBlur={() => setTitleFocused(false)}
           dangerouslySetInnerHTML={{ __html: note.title || '' }}
         />
 
@@ -330,6 +363,9 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
               ref={el => { blockRefs.current[block.id] = el; }}
               onInput={e => handleInput(e, block.id)}
               onKeyDown={e => handleKeyDown(e, block, idx)}
+              onFocus={() => setFocusedId(block.id)}
+              onBlur={() => setFocusedId(id => id === block.id ? null : id)}
+              isFocused={focusedId === block.id}
               onImageUpload={url => setBlocks(bs => bs.map(b => b.id === block.id ? { ...b, imageUrl: url } : b))}
             />
           ))}
@@ -339,11 +375,13 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
             setBlocks(bs => [...bs, nb]);
             focusBlock(nb.id);
           }} style={{ paddingTop: 12, paddingBottom: 40, cursor: 'text' }}>
-            <span style={{ fontSize: 13, color: 'var(--text3)', userSelect: 'none' }}>
-              Click to add a block, or press&nbsp;
-              <kbd style={{ padding: '1px 5px', background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: 4, fontFamily: 'var(--mono)', fontSize: 11 }}>/</kbd>
-              &nbsp;for commands
-            </span>
+            {(focusedId || titleFocused) && (
+              <span style={{ fontSize: 13, color: 'var(--text3)', userSelect: 'none' }}>
+                Click to add a block, or press&nbsp;
+                <kbd style={{ padding: '1px 5px', background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: 4, fontFamily: 'var(--mono)', fontSize: 11 }}>/</kbd>
+                &nbsp;for commands
+              </span>
+            )}
           </div>
         </div>
       </div>
