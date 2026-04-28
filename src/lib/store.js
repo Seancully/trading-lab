@@ -306,10 +306,12 @@ export const Store = {
   uid,
 
   getTrades() {
-    const existing = read(KEYS.trades, null);
-    if (existing) return existing;
+    return read(KEYS.trades, []);
+  },
+  loadSampleTrades() {
     const s = makeSample();
     localStorage.setItem(KEYS.trades, JSON.stringify(s));
+    for (const t of s) Sync.push('trade_' + t.id, t);
     return s;
   },
   saveTrade(trade) {

@@ -22,12 +22,22 @@ const ENTRY_MODELS = [
 
 const SESSIONS = ['London', 'NY AM Kill Zone', 'NY Lunch', 'NY PM', 'Asia', 'Other'];
 
-function TradeCard({ trade, onClick }) {
+function TradeCard({ trade, onClick, onDelete }) {
   const { date, time, instrument, direction, result, pnlDollars, rMultiple, screenshotUrl, entryModel, accounts } = trade;
   const accountLabel = accounts?.map(a => a.name).join(', ') || '—';
 
+  const handleDelete = (e) => {
+    e.stopPropagation();
+    if (window.confirm(`Delete trade from ${date}?`)) onDelete(trade.id);
+  };
+
   return (
     <div className="trade-card" onClick={() => onClick(trade)}>
+      <div className="quick-actions">
+        <button className="quick-action-btn danger" onClick={handleDelete} title="Delete trade">
+          <Icon name="trash" size={12}/>
+        </button>
+      </div>
       <div style={{
         height: 130, background: 'var(--bg)', position: 'relative',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -428,12 +438,31 @@ export default function Journal({ rules, settings }) {
       </div>
 
       {visible.length === 0 ? (
-        <Empty icon="📈" title="No trades match" desc={search || filter !== 'All' ? 'Try clearing your filter or search.' : 'Log your first trade to get started.'}
-          action={<Btn variant="primary" onClick={() => setAdding(true)}><Icon name="plus" size={14}/>New Trade</Btn>}/>
+        <div className="empty-state">
+          <div className="empty-illustration">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 17l4-8 4 4 4-6 4 3"/>
+              <path d="M3 21h18" opacity="0.3"/>
+            </svg>
+          </div>
+          <h3>{search || filter !== 'All' ? 'No trades match' : 'No trades yet'}</h3>
+          <p>{search || filter !== 'All' ? 'Try clearing your filter or search.' : 'Start logging trades — your equity curve grows from here.'}</p>
+          <div style={{ marginTop: 18, display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Btn variant="primary" onClick={() => setAdding(true)}><Icon name="plus" size={14}/>Log Your First Trade</Btn>
+            {trades.length === 0 && (
+              <Btn variant="ghost" onClick={() => {
+                if (window.confirm('Load 15 sample trades? You can delete them anytime.')) {
+                  setTrades(Store.loadSampleTrades());
+                  toast.success('Sample trades loaded');
+                }
+              }}>Load sample data</Btn>
+            )}
+          </div>
+        </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 }}>
           {visible.map(t => (
-            <TradeCard key={t.id} trade={t} onClick={setSelected}/>
+            <TradeCard key={t.id} trade={t} onClick={setSelected} onDelete={handleDelete}/>
           ))}
         </div>
       )}

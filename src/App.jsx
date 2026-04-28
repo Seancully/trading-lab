@@ -6,6 +6,9 @@ import {
   Icon, Btn, Modal, FInput, Badge, DirBadge, PnlText,
 } from './components/Shared.jsx';
 import Toaster from './components/Toaster.jsx';
+import AnimatedNumber from './components/AnimatedNumber.jsx';
+import Sparkline from './components/Sparkline.jsx';
+import CommandPalette from './components/CommandPalette.jsx';
 import Login from './pages/Login.jsx';
 import Journal from './pages/Journal.jsx';
 import Rules from './pages/Rules.jsx';
@@ -92,17 +95,24 @@ function Dashboard({ onNav }) {
       {stats && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 20 }}>
           {[
-            { label: 'Win Rate',       value: `${stats.winRate}%`,     sub: `${stats.wins}W · ${stats.losses}L · ${stats.bes}BE` },
-            { label: 'Profit Factor',  value: stats.profitFactor,      sub: `Gross win $${Math.round(stats.grossWin)}` },
-            { label: 'Avg R Won',      value: `+${stats.avgRWin}R`,    sub: `Avg R Lost: ${stats.avgRLoss}R`, color: 'var(--bull)' },
-            { label: 'Max Drawdown',   value: `-$${Math.round(stats.maxDD)}`, sub: `Best day +$${Math.round(stats.bestDay)}`, color: 'var(--bear)' },
-            { label: 'Rules Score',    value: stats.avgRulesScore != null ? `${stats.avgRulesScore}%` : '—',
+            { label: 'Win Rate',       num: parseFloat(stats.winRate), fmt: (v) => v.toFixed(1) + '%', sub: `${stats.wins}W · ${stats.losses}L · ${stats.bes}BE` },
+            { label: 'Profit Factor',  num: isFinite(parseFloat(stats.profitFactor)) ? parseFloat(stats.profitFactor) : null, raw: !isFinite(parseFloat(stats.profitFactor)) ? stats.profitFactor : null, fmt: (v) => v.toFixed(2), sub: `Gross win $${Math.round(stats.grossWin)}` },
+            { label: 'Avg R Won',      num: parseFloat(stats.avgRWin), fmt: (v) => '+' + v.toFixed(2) + 'R', sub: `Avg R Lost: ${stats.avgRLoss}R`, color: 'var(--bull)' },
+            { label: 'Max Drawdown',   num: Math.round(stats.maxDD), fmt: (v) => '-$' + Math.round(v).toLocaleString(), sub: `Best day +$${Math.round(stats.bestDay)}`, color: 'var(--bear)' },
+            { label: 'Rules Score',    num: stats.avgRulesScore, fmt: (v) => Math.round(v) + '%',
               sub: 'Avg checklist pass',
               color: stats.avgRulesScore >= 80 ? 'var(--bull)' : stats.avgRulesScore >= 60 ? 'var(--accent)' : 'var(--bear)' },
           ].map(s => (
             <div key={s.label} className="stat-card">
+              {stats.equity.length >= 2 && (
+                <div className="stat-spark">
+                  <Sparkline data={stats.equity.map(e => e.value)} width={60} height={20} stroke={s.color} />
+                </div>
+              )}
               <div className="stat-label">{s.label}</div>
-              <div className="stat-num" style={{ color: s.color || 'var(--text)' }}>{s.value}</div>
+              <div className="stat-num" style={{ color: s.color || 'var(--text)' }}>
+                {s.raw ?? (s.num == null ? '—' : <AnimatedNumber value={s.num} format={s.fmt}/>)}
+              </div>
               {s.sub && <div className="stat-sub">{s.sub}</div>}
             </div>
           ))}
@@ -224,7 +234,7 @@ function Badge2({ color, label, pulse }) {
       display: 'flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 20,
       background: dimMap[color], border: `1px solid ${borderMap[color]}`,
     }}>
-      <div style={{ width: 6, height: 6, borderRadius: '50%', background: map[color], animation: pulse ? 'pulse 1.2s infinite' : 'none' }}/>
+      <div className={pulse ? 'sync-dot' : ''} style={{ width: 6, height: 6, borderRadius: '50%', background: map[color], color: map[color] }}/>
       <span style={{ fontSize: 10, fontWeight: 600, color: map[color], letterSpacing: '0.04em' }}>{label}</span>
     </div>
   );
@@ -237,6 +247,7 @@ export default function App() {
   const [page, setPage]           = useState('dashboard');
   const [theme, setTheme]         = useState(() => Store.getSettings().theme || 'dark');
   const [showSettings, setShowSettings] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [settings, setSettings]   = useState(() => Store.getSettings());
   const [rules, setRules]         = useState(() => Store.getRules());
   const [syncStatus, setSyncStatus] = useState(Sync.status);
@@ -276,18 +287,27 @@ export default function App() {
     })();
   }, []);
 
-  // Keyboard shortcut: ⌘K opens journal new-trade
+  // ⌘K opens command palette
   useEffect(() => {
     const fn = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        setPage('journal');
-        setTimeout(() => window.dispatchEvent(new CustomEvent('tl:newTrade')), 50);
+        setPaletteOpen(o => !o);
       }
     };
     window.addEventListener('keydown', fn);
     return () => window.removeEventListener('keydown', fn);
   }, []);
+
+  const paletteItems = useMemo(() => [
+    ...NAV.map(n => ({ id: 'nav-' + n.id, label: 'Go to ' + n.label, group: 'Navigate', icon: n.icon, run: () => setPage(n.id) })),
+    { id: 'new-trade',  label: 'Log new trade',         group: 'Actions', icon: 'plus',     kbd: 'N', run: () => { setPage('journal'); setTimeout(() => window.dispatchEvent(new CustomEvent('tl:newTrade')), 50); } },
+    { id: 'new-setup',  label: 'New A+ setup note',     group: 'Actions', icon: 'plus',     run: () => { setPage('setups');  setTimeout(() => window.dispatchEvent(new CustomEvent('tl:newSetup')), 50); } },
+    { id: 'theme',      label: theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode', group: 'Actions', icon: theme === 'dark' ? 'sun' : 'moon', run: () => toggleTheme() },
+    { id: 'settings',   label: 'Open settings',         group: 'Actions', icon: 'settings', run: () => setShowSettings(true) },
+    ...(user ? [{ id: 'signout', label: 'Sign out',     group: 'Account', icon: 'logout',   run: () => handleSignOut() }] : []),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [theme, user]);
 
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
@@ -350,6 +370,22 @@ export default function App() {
         </div>
 
         <div className="topnav-actions">
+          <button
+            onClick={() => setPaletteOpen(true)}
+            title="Command palette"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '5px 8px 5px 10px', borderRadius: 7,
+              border: '1px solid var(--border2)', background: 'var(--surface)',
+              color: 'var(--text3)', cursor: 'pointer', fontSize: 11,
+              fontFamily: 'var(--font)', transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.background = 'var(--surface2)'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text3)'; e.currentTarget.style.background = 'var(--surface)'; }}
+          >
+            <Icon name="search" size={11}/>
+            <kbd className="kbd">⌘K</kbd>
+          </button>
           <SyncBadge status={syncStatus} hasUser={!!user} />
 
           <button className="icon-btn" onClick={toggleTheme} title={theme === 'dark' ? 'Light mode' : 'Dark mode'}>
@@ -398,7 +434,7 @@ export default function App() {
           )}
         </div>
 
-        <div className="main-content fade-in" key={page}>
+        <div className="main-content page-transition" key={page}>
           {page === 'dashboard'   && <Dashboard onNav={setPage}/>}
           {page === 'journal'     && <Journal rules={rules} settings={settings}/>}
           {page === 'rules'       && <Rules/>}
@@ -415,6 +451,8 @@ export default function App() {
       {showSettings && (
         <SettingsModal settings={settings} onSave={handleSaveSettings} onClose={() => setShowSettings(false)}/>
       )}
+
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} items={paletteItems} />
 
       <Toaster />
     </div>
