@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Store } from '../lib/store.js';
 import { Icon, Btn } from '../components/Shared.jsx';
 
@@ -31,9 +31,9 @@ function getBlockStyle(type) {
     display: 'block', minHeight: '1.65em',
   };
   switch (type) {
-    case 'h1':   return { ...base, fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.3, padding: '3px 0' };
-    case 'h2':   return { ...base, fontSize: 20, fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.35, padding: '2px 0' };
-    case 'h3':   return { ...base, fontSize: 16, fontWeight: 600, lineHeight: 1.4, padding: '2px 0' };
+    case 'h1':   return { ...base, fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.2, padding: '2px 0' };
+    case 'h2':   return { ...base, fontSize: 20, fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.25, padding: '1px 0' };
+    case 'h3':   return { ...base, fontSize: 16, fontWeight: 600, lineHeight: 1.3, padding: '1px 0' };
     case 'bq':   return { ...base, fontSize: 13, fontStyle: 'italic', color: 'var(--text2)', padding: '10px 14px',
       background: 'var(--surface2)', borderLeft: '3px solid var(--accent)', borderRadius: '0 6px 6px 0' };
     case 'hl':   return { ...base, fontSize: 13, background: 'var(--accentDim)', border: '1px solid var(--accentBorder)',
@@ -50,26 +50,71 @@ function getBlockStyle(type) {
   }
 }
 
-const Block = React.forwardRef(function Block({ block, idx, onInput, onKeyDown, onImageUpload, isFocused, onFocus, onBlur }, ref) {
+const Block = React.forwardRef(function Block({
+  block,
+  idx,
+  onInput,
+  onKeyDown,
+  onImageUpload,
+  isFocused,
+  isDragOver,
+  onFocus,
+  onBlur,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+}, ref) {
   const fileRef = useRef();
+  const localRef = useRef(null);
+
+  useImperativeHandle(ref, () => localRef.current);
+
+  useEffect(() => {
+    const el = localRef.current;
+    if (!el || isFocused) return;
+    const next = block.text || '';
+    if (el.innerText !== next) el.innerText = next;
+  }, [block.text, isFocused]);
 
   if (block.type === 'hr') {
-    return <div style={{ padding: '8px 0', cursor: 'default' }}>
-      <hr style={{ border: 'none', borderTop: '1px solid var(--border2)' }}/>
-    </div>;
+    return (
+      <div className={`block-row ${isFocused ? 'is-focused' : ''} ${isDragOver ? 'is-over' : ''}`}>
+        <div
+          className="block-handle"
+          draggable
+          onDragStart={(e) => onDragStart?.(e, block.id)}
+          onDragOver={(e) => onDragOver?.(e, block.id)}
+          onDrop={(e) => onDrop?.(e, block.id)}
+          onDragEnd={(e) => onDragEnd?.(e, block.id)}
+          title="Drag to reorder"
+        >⋮⋮</div>
+        <div style={{ padding: '8px 0', cursor: 'default', flex: 1 }}>
+          <hr style={{ border: 'none', borderTop: '1px solid var(--border2)' }}/>
+        </div>
+      </div>
+    );
   }
 
   if (block.type === 'img') {
     return (
-      <div style={{ padding: '4px 0' }}>
+      <div className={`block-row ${isFocused ? 'is-focused' : ''} ${isDragOver ? 'is-over' : ''}`}>
+        <div
+          className="block-handle"
+          draggable
+          onDragStart={(e) => onDragStart?.(e, block.id)}
+          onDragOver={(e) => onDragOver?.(e, block.id)}
+          onDrop={(e) => onDrop?.(e, block.id)}
+          title="Drag to reorder"
+        >⋮⋮</div>
+        <div style={{ padding: '4px 0', flex: 1 }}>
         {block.imageUrl ? (
           <div>
             <img src={block.imageUrl} alt="" style={{ maxWidth: '100%', borderRadius: 8, border: '1px solid var(--border)', display: 'block' }}/>
-            <div ref={ref} contentEditable suppressContentEditableWarning
+            <div ref={localRef} contentEditable suppressContentEditableWarning
               data-placeholder={isFocused ? 'Caption...' : ''} onInput={onInput}
               style={{ fontSize: 12, color: 'var(--text3)', marginTop: 6, outline: 'none', fontStyle: 'italic', minHeight: '1.4em' }}
               onKeyDown={onKeyDown} onFocus={onFocus} onBlur={onBlur}
-              dangerouslySetInnerHTML={{ __html: block.text || '' }}
             />
           </div>
         ) : (
@@ -80,6 +125,7 @@ const Block = React.forwardRef(function Block({ block, idx, onInput, onKeyDown, 
               onChange={async e => { const f = e.target.files[0]; if (f) onImageUpload(await Store.compressImage(f)); }}/>
           </div>
         )}
+        </div>
       </div>
     );
   }
@@ -97,10 +143,19 @@ const Block = React.forwardRef(function Block({ block, idx, onInput, onKeyDown, 
     : '';
 
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', margin: '1px 0' }}>
+    <div className={`block-row ${isFocused ? 'is-focused' : ''} ${isDragOver ? 'is-over' : ''}`}>
+      <div
+        className="block-handle"
+        draggable
+        onDragStart={(e) => onDragStart?.(e, block.id)}
+        onDragOver={(e) => onDragOver?.(e, block.id)}
+        onDrop={(e) => onDrop?.(e, block.id)}
+        onDragEnd={(e) => onDragEnd?.(e, block.id)}
+        title="Drag to reorder"
+      >⋮⋮</div>
       {prefix}
       <div
-        ref={ref}
+        ref={localRef}
         contentEditable
         suppressContentEditableWarning
         data-placeholder={placeholder}
@@ -109,7 +164,8 @@ const Block = React.forwardRef(function Block({ block, idx, onInput, onKeyDown, 
         onKeyDown={onKeyDown}
         onFocus={onFocus}
         onBlur={onBlur}
-        dangerouslySetInnerHTML={{ __html: block.text || '' }}
+        onDragOver={(e) => onDragOver?.(e, block.id)}
+        onDrop={(e) => onDrop?.(e, block.id)}
       />
     </div>
   );
@@ -117,6 +173,7 @@ const Block = React.forwardRef(function Block({ block, idx, onInput, onKeyDown, 
 
 function SlashMenu({ pos, query, onSelect, onClose }) {
   const [sel, setSel] = useState(0);
+        onDragEnd={(e) => onDragEnd?.(e, block.id)}
   const itemRefs = useRef([]);
   const filtered = BLOCK_TYPES.filter(t => {
     if (!query) return true;
@@ -178,8 +235,11 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
   const [slash,  setSlash]  = useState(null);
   const [focusedId, setFocusedId] = useState(null);
   const [titleFocused, setTitleFocused] = useState(false);
+  const [dragOverId, setDragOverId] = useState(null);
   const blockRefs  = useRef({});
   const saveTimer  = useRef(null);
+  const titleRef = useRef(null);
+  const dragId = useRef(null);
 
   const schedSave = useCallback((t, b, tg, em) => {
     clearTimeout(saveTimer.current);
@@ -190,6 +250,12 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
 
   useEffect(() => { schedSave(title, blocks, tags, emoji); }, [title, blocks, tags, emoji, schedSave]);
   useEffect(() => () => clearTimeout(saveTimer.current), []);
+
+  useEffect(() => {
+    const el = titleRef.current;
+    if (!el || titleFocused) return;
+    if (el.innerText !== (title || '')) el.innerText = title || '';
+  }, [title, titleFocused]);
 
   const focusBlock = (id, atEnd = true) => {
     setTimeout(() => {
@@ -222,23 +288,80 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
   };
 
   const updateBlockText = (id, text) => {
-    setBlocks(bs => bs.map(b => b.id === id ? { ...b, text } : b));
+    setBlocks(bs => {
+      const idx = bs.findIndex(b => b.id === id);
+      if (idx === -1) return bs;
+      if ((bs[idx].text || '') === text) return bs;
+      const next = [...bs];
+      next[idx] = { ...next[idx], text };
+      return next;
+    });
+  };
+
+  const moveBlock = (fromId, toId) => {
+    if (!fromId || !toId || fromId === toId) return;
+    setBlocks(bs => {
+      const from = bs.findIndex(b => b.id === fromId);
+      const to = bs.findIndex(b => b.id === toId);
+      if (from === -1 || to === -1) return bs;
+      const next = [...bs];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
+  };
+
+  const getCaretPos = () => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return null;
+    const range = sel.getRangeAt(0).cloneRange();
+    range.collapse(true);
+    const rect = range.getBoundingClientRect();
+    if (rect && (rect.top || rect.left)) return { x: rect.left, y: rect.bottom };
+    return null;
+  };
+
+  const getSlashInfo = (text) => {
+    const trimmed = text.replace(/\s+$/g, '');
+    const idx = trimmed.lastIndexOf('/');
+    if (idx < 0) return null;
+    const before = trimmed.slice(0, idx);
+    if (before.trim() !== '') return null;
+    return { idx, query: trimmed.slice(idx + 1) };
+  };
+
+  const openSlashAtCaret = (blockId, fallbackEl) => {
+    const caret = getCaretPos();
+    const rect = caret || (fallbackEl ? fallbackEl.getBoundingClientRect() : null);
+    if (!rect) return;
+    setSlash({ blockId, pos: { x: rect.x || rect.left, y: rect.y || rect.bottom }, query: '' });
   };
 
   const handleInput = (e, blockId) => {
-    const text = e.target.innerText || '';
-    if (text === '/') {
-      const rect = e.target.getBoundingClientRect();
-      setSlash({ blockId, pos: { x: rect.left, y: rect.bottom }, query: '' });
+    const text = e.currentTarget.innerText || '';
+    const info = getSlashInfo(text);
+    if (info) {
+      const caret = getCaretPos();
+      if (caret) {
+        setSlash(s => ({ blockId, pos: caret, query: info.query }));
+      } else if (!slash || slash.blockId !== blockId) {
+        const rect = e.currentTarget.getBoundingClientRect();
+        setSlash({ blockId, pos: { x: rect.left, y: rect.bottom }, query: info.query });
+      } else {
+        setSlash(s => ({ ...s, query: info.query }));
+      }
     } else if (slash?.blockId === blockId) {
-      const afterSlash = text.startsWith('/') ? text.slice(1) : null;
-      if (afterSlash !== null) setSlash(s => ({ ...s, query: afterSlash }));
-      else setSlash(null);
+      setSlash(null);
     }
     updateBlockText(blockId, text);
   };
 
   const handleKeyDown = (e, block, idx) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === '/') {
+      e.preventDefault();
+      openSlashAtCaret(block.id, blockRefs.current[block.id]);
+      return;
+    }
     if (slash && ['ArrowDown','ArrowUp','Enter'].includes(e.key)) return;
     if (e.key === 'Escape' && slash) { setSlash(null); return; }
 
@@ -292,6 +415,32 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
     setSlash(null);
   };
 
+  const handleDragStart = (e, id) => {
+    dragId.current = id;
+    setDragOverId(null);
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', id); } catch {}
+  };
+
+  const handleDragOver = (e, id) => {
+    if (!dragId.current || dragId.current === id) return;
+    e.preventDefault();
+    setDragOverId(id);
+  };
+
+  const handleDrop = (e, id) => {
+    e.preventDefault();
+    const from = dragId.current;
+    dragId.current = null;
+    setDragOverId(null);
+    moveBlock(from, id);
+  };
+
+  const handleDragEnd = () => {
+    dragId.current = null;
+    setDragOverId(null);
+  };
+
   const addTag = () => {
     const t = newTag.trim();
     if (t && !tags.includes(t)) setTags(prev => [...prev, t]);
@@ -318,6 +467,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
         <div style={{ fontSize: 38, marginBottom: 10, cursor: 'default', userSelect: 'none', lineHeight: 1 }}>{emoji}</div>
 
         <div
+          ref={titleRef}
           contentEditable suppressContentEditableWarning
           data-placeholder={titleFocused ? 'Untitled' : ''}
           style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-0.025em', outline: 'none',
@@ -326,7 +476,6 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
           onInput={e => setTitle(e.target.innerText || '')}
           onFocus={() => setTitleFocused(true)}
           onBlur={() => setTitleFocused(false)}
-          dangerouslySetInnerHTML={{ __html: note.title || '' }}
         />
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20, alignItems: 'center' }}>
@@ -366,6 +515,11 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
               onFocus={() => setFocusedId(block.id)}
               onBlur={() => setFocusedId(id => id === block.id ? null : id)}
               isFocused={focusedId === block.id}
+              isDragOver={dragOverId === block.id}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              onDragEnd={handleDragEnd}
               onImageUpload={url => setBlocks(bs => bs.map(b => b.id === block.id ? { ...b, imageUrl: url } : b))}
             />
           ))}

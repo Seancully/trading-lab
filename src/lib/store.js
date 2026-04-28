@@ -7,6 +7,7 @@ import { supabase, supabaseConfigured } from './supabase.js';
 const KEYS = {
   trades: 'tl_trades',
   rules: 'tl_rules',
+  rulesVersion: 'tl_rules_version',
   setups: 'tl_setups',
   settings: 'tl_settings',
   notes: 'tl_notes',
@@ -17,32 +18,31 @@ export function uid() {
 }
 
 // ── Defaults ────────────────────────────────────────────────────────────────
+const DEFAULT_RULES_VERSION = 2;
 const DEFAULT_RULES = [
-  { id: 'cat-entry', category: 'Entry Criteria', rules: [
-    { id: uid(), text: 'HTF PDA aligns with bias & narrative', required: true },
-    { id: uid(), text: 'IFVG confirmed on entry timeframe', required: true },
-    { id: uid(), text: 'Strong DOL visible and within draw', required: true },
-    { id: uid(), text: 'Internal or external range context clear', required: true },
-    { id: uid(), text: 'SMT confirmation present (bonus)', required: false },
-    { id: uid(), text: 'LRL respected where applicable (bonus)', required: false },
+  { id: 'cat-daily', category: 'Daily Limits', rules: [
+    { id: uid(), text: '1 trade per day (2 max)', required: true },
+    { id: uid(), text: 'Trade window: 9:30-11:00 NY AM', required: true },
   ]},
-  { id: 'cat-risk', category: 'Risk Management', rules: [
-    { id: uid(), text: 'Stop loss defined before entry', required: true },
-    { id: uid(), text: 'Risk per contract within plan', required: true },
-    { id: uid(), text: 'Not over-exposed across accounts combined', required: true },
-    { id: uid(), text: 'Max 2 trades per session respected', required: true },
+  { id: 'cat-entry', category: 'Entry Checklist', rules: [
+    { id: uid(), text: 'HTF PDA', required: true },
+    { id: uid(), text: 'IFVG present on entry timeframe', required: true },
+    { id: uid(), text: 'A+ DOL clear', required: true },
+    { id: uid(), text: 'Stop hunt first (bonus)', required: false },
+    { id: uid(), text: 'Good displacement on IFVG (bonus)', required: false },
+    { id: uid(), text: 'SMT confirmation (bonus)', required: false },
+    { id: uid(), text: 'LTF LRL leading to HTF DOL (bonus)', required: false },
   ]},
-  { id: 'cat-exec', category: 'Execution', rules: [
-    { id: uid(), text: 'Entry taken in correct session window', required: true },
-    { id: uid(), text: 'Not trading against HTF structure', required: true },
-    { id: uid(), text: 'Waited for displacement before entry', required: true },
-    { id: uid(), text: 'No FOMO — model presented itself cleanly', required: true },
-  ]},
-  { id: 'cat-exit', category: 'Exit & Review', rules: [
-    { id: uid(), text: 'Profit target set at DOL before entry', required: true },
-    { id: uid(), text: 'No early exit without structural reason', required: true },
-    { id: uid(), text: 'Trade journalled with screenshot same day', required: true },
-    { id: uid(), text: 'No revenge trade after a loss', required: true },
+  { id: 'cat-avoid', category: 'Do Not Trade', rules: [
+    { id: uid(), text: 'No consolidation', required: true },
+    { id: uid(), text: 'ES correlation intact', required: true },
+    { id: uid(), text: 'Aligns with HTF narrative', required: true },
+    { id: uid(), text: 'Not against EQH/EQL/LRL', required: true },
+    { id: uid(), text: 'DOL is very clear', required: true },
+    { id: uid(), text: 'No low volume (tiny candles)', required: true },
+    { id: uid(), text: 'Daily loss <= 2% (even evals)', required: true },
+    { id: uid(), text: 'Passed account risk <= 1% (prefer 0.5-1%)', required: true },
+    { id: uid(), text: 'No strong/close SMT against direction', required: true },
   ]},
 ];
 
@@ -330,10 +330,23 @@ export const Store = {
   },
   clearLocalTrades() { localStorage.removeItem(KEYS.trades); },
 
-  getRules() { return read(KEYS.rules, DEFAULT_RULES); },
+  getRules() {
+    const version = read(KEYS.rulesVersion, 0);
+    const stored = read(KEYS.rules, null);
+    if (!stored || version !== DEFAULT_RULES_VERSION) {
+      localStorage.setItem(KEYS.rules, JSON.stringify(DEFAULT_RULES));
+      localStorage.setItem(KEYS.rulesVersion, JSON.stringify(DEFAULT_RULES_VERSION));
+      Sync.push('rules', DEFAULT_RULES);
+      Sync.push('rules_version', DEFAULT_RULES_VERSION);
+      return DEFAULT_RULES;
+    }
+    return stored;
+  },
   saveRules(rules) {
     localStorage.setItem(KEYS.rules, JSON.stringify(rules));
+    localStorage.setItem(KEYS.rulesVersion, JSON.stringify(DEFAULT_RULES_VERSION));
     Sync.push('rules', rules);
+    Sync.push('rules_version', DEFAULT_RULES_VERSION);
   },
 
   getNotes() { return read(KEYS.notes, DEFAULT_NOTES); },
