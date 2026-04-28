@@ -347,6 +347,9 @@ export const Store = {
     localStorage.setItem(KEYS.rulesVersion, JSON.stringify(DEFAULT_RULES_VERSION));
     Sync.push('rules', rules);
     Sync.push('rules_version', DEFAULT_RULES_VERSION);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tl:rulesUpdated', { detail: rules }));
+    }
   },
 
   getNotes() { return read(KEYS.notes, DEFAULT_NOTES); },

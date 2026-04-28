@@ -311,6 +311,15 @@ export default function App() {
     return () => window.removeEventListener('tl:openTrade', fn);
   }, []);
 
+  useEffect(() => {
+    const fn = (e) => {
+      const next = e.detail;
+      if (Array.isArray(next)) setRules(next);
+    };
+    window.addEventListener('tl:rulesUpdated', fn);
+    return () => window.removeEventListener('tl:rulesUpdated', fn);
+  }, []);
+
   const paletteItems = useMemo(() => [
     ...NAV.map(n => ({ id: 'nav-' + n.id, label: 'Go to ' + n.label, group: 'Navigate', icon: n.icon, run: () => setPage(n.id) })),
     { id: 'new-trade',  label: 'Log new trade',         group: 'Actions', icon: 'plus',     kbd: 'N', run: () => { setPage('journal'); setTimeout(() => window.dispatchEvent(new CustomEvent('tl:newTrade')), 50); } },
