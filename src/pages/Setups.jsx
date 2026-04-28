@@ -173,7 +173,6 @@ const Block = React.forwardRef(function Block({
 
 function SlashMenu({ pos, query, onSelect, onClose }) {
   const [sel, setSel] = useState(0);
-        onDragEnd={(e) => onDragEnd?.(e, block.id)}
   const itemRefs = useRef([]);
   const filtered = BLOCK_TYPES.filter(t => {
     if (!query) return true;
