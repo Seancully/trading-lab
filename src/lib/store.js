@@ -363,6 +363,72 @@ export const Store = {
     for (const t of s) Sync.push('trade_' + t.id, t);
     return s;
   },
+
+  // Build a weekly-review note from the past 7 days of trades and save it.
+  // Returns the new note's id.
+  createWeeklyReviewNote() {
+    const trades = this.getTrades();
+    const now = new Date();
+    const day = now.getDay(); // 0 Sun .. 6 Sat
+    // Treat the week as Monday → Sunday containing today
+    const offset = (day + 6) % 7; // days since Monday
+    const start = new Date(now); start.setDate(now.getDate() - offset);
+    const end   = new Date(start); end.setDate(start.getDate() + 6);
+    const ymd = (d) => d.toISOString().slice(0, 10);
+    const weekTrades = trades.filter(t => t.date && t.date >= ymd(start) && t.date <= ymd(end));
+
+    const wins = weekTrades.filter(t => t.result === 'Win').length;
+    const losses = weekTrades.filter(t => t.result === 'Loss').length;
+    const bes = weekTrades.filter(t => t.result === 'BE').length;
+    const totalPnl = weekTrades.reduce((s, t) => s + (Number(t.pnlDollars) || 0), 0);
+    const winRate = weekTrades.length ? Math.round((wins / weekTrades.length) * 100) : 0;
+    const byDay = {};
+    for (const t of weekTrades) byDay[t.date] = (byDay[t.date] || 0) + (Number(t.pnlDollars) || 0);
+    const dayVals = Object.values(byDay);
+    const bestDay = dayVals.length ? Math.max(...dayVals) : 0;
+    const worstDay = dayVals.length ? Math.min(...dayVals) : 0;
+    const byModel = {};
+    for (const t of weekTrades) {
+      const m = t.entryModel || 'Other';
+      byModel[m] = (byModel[m] || 0) + 1;
+    }
+    const topModels = Object.entries(byModel).sort((a, b) => b[1] - a[1]).slice(0, 3);
+
+    const fmt = (v) => `${v >= 0 ? '+' : '-'}$${Math.abs(Math.round(v)).toLocaleString()}`;
+    const monthName = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const endName = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    const blocks = [
+      { id: uid(), type: 'h1',  text: `Week of ${monthName} – ${endName}` },
+      { id: uid(), type: 'p',   text: `${weekTrades.length} trade${weekTrades.length === 1 ? '' : 's'} · ${wins}W · ${losses}L · ${bes}BE · ${winRate}% WR · ${fmt(totalPnl)}` },
+      { id: uid(), type: 'h2',  text: 'The numbers' },
+      { id: uid(), type: 'li',  text: `Total P&L: ${fmt(totalPnl)}` },
+      { id: uid(), type: 'li',  text: `Best day: ${fmt(bestDay)} · Worst day: ${fmt(worstDay)}` },
+      { id: uid(), type: 'li',  text: `Top models: ${topModels.length ? topModels.map(([m, c]) => `${m} (${c})`).join(', ') : '—'}` },
+      { id: uid(), type: 'h2',  text: 'What worked' },
+      { id: uid(), type: 'p',   text: '' },
+      { id: uid(), type: 'h2',  text: 'What didn\'t' },
+      { id: uid(), type: 'p',   text: '' },
+      { id: uid(), type: 'h2',  text: 'Lessons' },
+      { id: uid(), type: 'li',  text: '' },
+      { id: uid(), type: 'li',  text: '' },
+      { id: uid(), type: 'h2',  text: 'Adjustments for next week' },
+      { id: uid(), type: 'li',  text: '' },
+      { id: uid(), type: 'bq',  text: 'Did I follow my rules? Where did I deviate, and why?' },
+    ];
+
+    const note = {
+      id: uid(),
+      emoji: '📊',
+      title: `Weekly review · ${monthName} – ${endName}`,
+      tags: ['Review', 'Weekly'],
+      blocks,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    this.saveNote(note);
+    return note.id;
+  },
   saveTrade(trade) {
     const trades = this.getTrades();
     const idx = trades.findIndex(t => t.id === trade.id);

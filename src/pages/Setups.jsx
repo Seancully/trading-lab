@@ -702,7 +702,18 @@ export default function Setups() {
   useEffect(() => {
     const fn = () => createNote();
     window.addEventListener('tl:newSetup', fn);
-    return () => window.removeEventListener('tl:newSetup', fn);
+    const open = (e) => {
+      const id = e.detail?.id;
+      if (!id) return;
+      // Refresh notes from store so the new one is visible, then select it.
+      setNotes(Store.getNotes());
+      setSelectedId(id);
+    };
+    window.addEventListener('tl:openSetup', open);
+    return () => {
+      window.removeEventListener('tl:newSetup', fn);
+      window.removeEventListener('tl:openSetup', open);
+    };
   }, []);
 
   const handleSave = (note) => setNotes(Store.saveNote(note));
