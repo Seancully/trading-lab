@@ -780,3 +780,24 @@ body.light .form-select option { background: #ffffff; color: #0A0A0C; }
 }
 .sel-color-row:hover { background: var(--surface3); }
 .sel-color-dot { width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0; }
+
+/* ── Account filter row — custom toggle (no native checkbox) ────────────── */
+.account-filter-menu .account-row {
+  width: 100%;
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: 7px;
+  background: transparent; border: none; cursor: pointer;
+  font-family: var(--font); font-size: 13px; color: var(--text);
+  transition: background 0.1s;
+}
+.account-filter-menu .account-row:hover { background: var(--surface3); }
+.account-filter-menu .account-row.selected { color: var(--text); }
+.account-filter-menu .row-check {
+  width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0;
+  border: 1.5px solid var(--border2); background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  color: transparent; transition: all 0.12s;
+}
+.account-filter-menu .row-check.on {
+  background: var(--accent); border-color: var(--accent); color: var(--bg);
+}

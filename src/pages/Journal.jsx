@@ -447,8 +447,9 @@ export default function Journal({ rules, settings, openTradeId, onOpenHandled, a
   };
 
   let visible = [...trades];
-  if (accountFilter && accountFilter.length) {
-    visible = visible.filter(t => t.accounts?.some(a => accountFilter.includes(a.name)));
+  if (accountFilter != null) {
+    if (Array.isArray(accountFilter) && !accountFilter.length) visible = [];
+    else visible = visible.filter(t => t.accounts?.some(a => accountFilter.includes(a.name)));
   }
   if (filter !== 'All') visible = visible.filter(t => t.result === filter);
   if (search) {

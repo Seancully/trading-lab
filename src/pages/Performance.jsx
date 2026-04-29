@@ -517,7 +517,8 @@ export default function Performance({ accountFilter }) {
   const [period, setPeriod] = useState('All');
 
   const trades = useMemo(() => {
-    if (!accountFilter || !accountFilter.length) return allTrades;
+    if (accountFilter == null) return allTrades;
+    if (Array.isArray(accountFilter) && !accountFilter.length) return [];
     return allTrades.filter(t => t.accounts?.some(a => accountFilter.includes(a.name)));
   }, [allTrades, accountFilter]);
 

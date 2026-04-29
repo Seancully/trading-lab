@@ -24,6 +24,20 @@ function newBlock(type = 'p', text = '') {
   return { id: Store.uid(), type, text };
 }
 
+// Walk the contenteditable's selection and return the caret offset within
+// the element's textContent. Used to split a block at the caret on Enter.
+function getCaretOffset(el) {
+  if (!el) return 0;
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return (el.innerText || '').length;
+  const range = sel.getRangeAt(0);
+  if (!el.contains(range.endContainer)) return (el.innerText || '').length;
+  const pre = range.cloneRange();
+  pre.selectNodeContents(el);
+  pre.setEnd(range.endContainer, range.endOffset);
+  return pre.toString().length;
+}
+
 function getBlockStyle(type) {
   const base = {
     width: '100%', outline: 'none', border: 'none',
@@ -387,14 +401,42 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
       if (block.type === 'code') return;
       e.preventDefault();
       setSlash(null);
-      const currentText = blockRefs.current[block.id]?.innerText || '';
+      const el = blockRefs.current[block.id];
+      const currentText = el?.innerText || '';
+
+      // Empty list item → convert to paragraph (existing behavior)
       if ((block.type === 'li' || block.type === 'num') && !currentText.trim()) {
         setBlocks(bs => bs.map(b => b.id === block.id ? { ...b, type: 'p', text: '' } : b));
         focusBlock(block.id);
-      } else {
-        const continueType = (block.type === 'li' || block.type === 'num') ? block.type : 'p';
-        insertBlock(idx, continueType);
+        return;
       }
+
+      // Split at the caret: text before stays, text after moves to a new block.
+      const offset = getCaretOffset(el);
+      const before = currentText.slice(0, offset);
+      const after  = currentText.slice(offset);
+      const continueType = (block.type === 'li' || block.type === 'num') ? block.type : 'p';
+      const newId = Store.uid();
+
+      setBlocks(bs => {
+        const next = [...bs];
+        const i = next.findIndex(b => b.id === block.id);
+        if (i < 0) return bs;
+        next[i] = { ...next[i], text: before };
+        next.splice(i + 1, 0, { id: newId, type: continueType, text: after });
+        return next;
+      });
+      // Focus the new block at the start of its content
+      setTimeout(() => {
+        const el2 = blockRefs.current[newId];
+        if (!el2) return;
+        el2.focus();
+        const r = document.createRange();
+        r.selectNodeContents(el2);
+        r.collapse(true);
+        const s = window.getSelection();
+        s.removeAllRanges(); s.addRange(r);
+      }, 30);
       return;
     }
 
@@ -491,7 +533,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
         ref={bodyRef}
         style={{ flex: 1, overflowY: 'auto', padding: '36px 52px 80px' }}
         onPaste={async (e) => {
-          // Paste-image-anywhere: detect image in clipboard, insert as new img block.
+          // 1) Image in clipboard → insert as a new img block after the focused one.
           const items = e.clipboardData?.items || [];
           for (const item of items) {
             if (item.type && item.type.startsWith('image/')) {
@@ -501,7 +543,6 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
               const url = await Store.compressImage(file);
               const nb = { id: Store.uid(), type: 'img', text: '', imageUrl: url };
               setBlocks(bs => {
-                // Insert after focused block if any, else at end
                 const idx = bs.findIndex(b => b.id === focusedId);
                 const next = [...bs];
                 if (idx >= 0) next.splice(idx + 1, 0, nb); else next.push(nb);
@@ -510,6 +551,36 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
               return;
             }
           }
+
+          // 2) Plain-text paste with multiple lines → split into blocks like Notion.
+          //    Single-line text falls through to the browser so the caret stays put.
+          const text = e.clipboardData?.getData('text/plain') || '';
+          if (!text || !text.includes('\n')) return;
+          e.preventDefault();
+          const lines = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+          if (!lines.length) return;
+          const newBlocks = lines.map(t => ({ id: Store.uid(), type: 'p', text: t }));
+
+          setBlocks(bs => {
+            const idx = bs.findIndex(b => b.id === focusedId);
+            // If the focused block is empty, replace it with the first pasted line
+            // and insert the rest after; otherwise insert all after the current.
+            if (idx >= 0) {
+              const next = [...bs];
+              const cur = next[idx];
+              if (!cur.text || !cur.text.trim()) {
+                next[idx] = { ...cur, text: newBlocks[0].text };
+                next.splice(idx + 1, 0, ...newBlocks.slice(1));
+              } else {
+                next.splice(idx + 1, 0, ...newBlocks);
+              }
+              return next;
+            }
+            return [...bs, ...newBlocks];
+          });
+          // Focus the last inserted block
+          const last = newBlocks[newBlocks.length - 1];
+          setTimeout(() => focusBlock(last.id), 30);
         }}
       >
         <div style={{ fontSize: 38, marginBottom: 10, cursor: 'default', userSelect: 'none', lineHeight: 1 }}>{emoji}</div>

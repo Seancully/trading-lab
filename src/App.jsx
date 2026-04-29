@@ -37,7 +37,8 @@ const PAGE_SUB = {
 };
 
 function applyAccountFilter(trades, filter) {
-  if (!filter || !filter.length) return trades;
+  if (filter == null) return trades;            // null → all
+  if (Array.isArray(filter) && !filter.length) return []; // [] → none
   return trades.filter(t => t.accounts?.some(a => filter.includes(a.name)));
 }
 
@@ -52,18 +53,30 @@ function AccountFilterPill({ accounts, value, onChange }) {
     return () => document.removeEventListener('mousedown', fn);
   }, [open]);
 
-  const active = value && value.length;
-  const label = !active
+  // Convention: value === null  → all accounts (no filter)
+  //             value === []    → none selected (no trades)
+  //             value === [...] → only those selected
+  const isAll = value === null || value === undefined;
+  const isNone = Array.isArray(value) && value.length === 0;
+  const label = isAll
     ? 'All accounts'
+    : isNone
+    ? 'No accounts'
     : value.length === 1 ? value[0]
     : `${value.length} accounts`;
+  const active = !isAll;
 
   const toggle = (acc) => {
-    const set = new Set(value || []);
+    // When starting from "all", treat as if every account is currently in the set.
+    const current = isAll ? accounts : value;
+    const set = new Set(current);
     if (set.has(acc)) set.delete(acc); else set.add(acc);
     const next = [...set];
-    onChange(next.length === accounts.length ? null : next.length ? next : null);
+    if (next.length === accounts.length) onChange(null);
+    else onChange(next);
   };
+
+  const isSelected = (acc) => isAll || (Array.isArray(value) && value.includes(acc));
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
@@ -72,17 +85,28 @@ function AccountFilterPill({ accounts, value, onChange }) {
         <span style={{ maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
       </button>
       {open && (
-        <div className="account-filter-menu">
+        <div className="account-filter-menu" role="listbox">
           <div style={{ fontSize: 10, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '6px 10px 4px' }}>
             Show trades from
           </div>
           {accounts.map(acc => {
-            const checked = !value || value.includes(acc);
+            const sel = isSelected(acc);
             return (
-              <label key={acc} className="menu-row">
-                <input type="checkbox" checked={checked} onChange={() => toggle(acc)}/>
-                <span>{acc}</span>
-              </label>
+              <button
+                key={acc}
+                type="button"
+                className={`menu-row account-row ${sel ? 'selected' : ''}`}
+                onClick={() => toggle(acc)}
+              >
+                <span className={`row-check ${sel ? 'on' : ''}`}>
+                  {sel && (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="5 12 10 17 19 7"/>
+                    </svg>
+                  )}
+                </span>
+                <span style={{ flex: 1, textAlign: 'left' }}>{acc}</span>
+              </button>
             );
           })}
           <div className="menu-foot">
