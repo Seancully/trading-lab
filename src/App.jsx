@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Store, Sync } from './lib/store.js';
+import { Store, Sync, effectivePnl } from './lib/store.js';
 import { supabaseConfigured } from './lib/supabase.js';
 import { toast } from './lib/toast.js';
 import {
@@ -22,7 +22,7 @@ const NAV = [
   { id: 'journal',     label: 'Journal',      icon: 'journal' },
   { id: 'rules',       label: 'My Rules',     icon: 'rules' },
   { id: 'confluences', label: 'Confluences',  icon: 'rules' },
-  { id: 'setups',      label: 'A+ Setups',    icon: 'setups' },
+  { id: 'setups',      label: 'Notes',        icon: 'setups' },
   { id: 'performance', label: 'Performance',  icon: 'perf' },
   { id: 'calendar',    label: 'Calendar',     icon: 'calendar' },
 ];
@@ -32,7 +32,7 @@ const PAGE_SUB = {
   journal:     'All logged trades · click to open',
   rules:       'Your trading rulebook — auto-saved',
   confluences: 'Confluences shown when logging a trade',
-  setups:      'HTF PDA · IFVG · Internal/External · SMT',
+  setups:      'Notes, playbooks, and weekly reviews',
   performance: 'Metrics, equity curve, model breakdown',
   calendar:    'Monthly P&L · Mon–Fri view',
 };
@@ -140,7 +140,7 @@ function PnlChip({ value, label }) {
 function Dashboard({ onNav, accountFilter }) {
   const allTrades = useMemo(() => Store.getTrades(), []);
   const trades = useMemo(() => applyAccountFilter(allTrades, accountFilter), [allTrades, accountFilter]);
-  const stats  = useMemo(() => calcStats(trades), [trades]);
+  const stats  = useMemo(() => calcStats(trades, accountFilter), [trades, accountFilter]);
   const recent = trades.slice(0, 6);
 
   const today     = new Date().toISOString().slice(0, 10);
@@ -152,9 +152,10 @@ function Dashboard({ onNav, accountFilter }) {
   const weekTrades   = trades.filter(t => (t.date || '') >= weekStr);
   const monthTrades  = trades.filter(t => (t.date || '').startsWith(monthStr));
 
-  const todayPnl  = todayTrades.reduce((s, t) => s + (t.pnlDollars || 0), 0);
-  const weekPnl   = weekTrades.reduce((s, t) => s + (t.pnlDollars || 0), 0);
-  const monthPnl  = monthTrades.reduce((s, t) => s + (t.pnlDollars || 0), 0);
+  const eff = (t) => effectivePnl(t, accountFilter);
+  const todayPnl  = todayTrades.reduce((s, t) => s + eff(t), 0);
+  const weekPnl   = weekTrades.reduce((s, t) => s + eff(t), 0);
+  const monthPnl  = monthTrades.reduce((s, t) => s + eff(t), 0);
 
   const greet = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening';
   const dateLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
@@ -240,7 +241,7 @@ function Dashboard({ onNav, accountFilter }) {
                   <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 1 }}>{t.date} · {t.instrument}</div>
                 </div>
                 <Badge result={t.result}/>
-                <PnlText value={t.pnlDollars} size={13}/>
+                <PnlText value={eff(t)} size={13}/>
               </div>
             ))
           }
@@ -417,7 +418,7 @@ export default function App() {
   const paletteItems = useMemo(() => [
     ...NAV.map(n => ({ id: 'nav-' + n.id, label: 'Go to ' + n.label, group: 'Navigate', icon: n.icon, run: () => setPage(n.id) })),
     { id: 'new-trade',  label: 'Log new trade',         group: 'Actions', icon: 'plus',     kbd: 'N', run: () => { setPage('journal'); setTimeout(() => window.dispatchEvent(new CustomEvent('tl:newTrade')), 50); } },
-    { id: 'new-setup',  label: 'New A+ setup note',     group: 'Actions', icon: 'plus',     run: () => { setPage('setups');  setTimeout(() => window.dispatchEvent(new CustomEvent('tl:newSetup')), 50); } },
+    { id: 'new-setup',  label: 'New note',              group: 'Actions', icon: 'plus',     run: () => { setPage('setups');  setTimeout(() => window.dispatchEvent(new CustomEvent('tl:newSetup')), 50); } },
     { id: 'new-review', label: 'New weekly review',     group: 'Actions', icon: 'journal',  run: () => { setPage('setups'); setTimeout(() => { const id = Store.createWeeklyReviewNote(); window.dispatchEvent(new CustomEvent('tl:openSetup', { detail: { id } })); toast.success('Weekly review created'); }, 50); } },
     { id: 'theme',      label: theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode', group: 'Actions', icon: theme === 'dark' ? 'sun' : 'moon', run: () => toggleTheme() },
     { id: 'settings',   label: 'Open settings',         group: 'Actions', icon: 'settings', run: () => setShowSettings(true) },
@@ -552,7 +553,7 @@ export default function App() {
           )}
           {page === 'setups' && (
             <Btn variant="primary" onClick={() => window.dispatchEvent(new CustomEvent('tl:newSetup'))}>
-              <Icon name="plus" size={13}/>New Setup
+              <Icon name="plus" size={13}/>New Note
             </Btn>
           )}
         </div>
@@ -575,10 +576,10 @@ export default function App() {
           {page === 'performance' && <Performance accountFilter={accountFilter}/>}
           {page === 'calendar'    && (() => {
             const filtered = applyAccountFilter(Store.getTrades(), accountFilter);
-            const byDay = calcStats(filtered)?.byDay || {};
+            const byDay = calcStats(filtered, accountFilter)?.byDay || {};
             return (
               <div className="card">
-                <CalendarView byDay={byDay} trades={filtered}/>
+                <CalendarView byDay={byDay} trades={filtered} accountFilter={accountFilter}/>
               </div>
             );
           })()}

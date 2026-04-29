@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Store } from '../lib/store.js';
+import { Store, effectivePnl, effectiveContracts } from '../lib/store.js';
 import { toast } from '../lib/toast.js';
 import {
   Icon, Badge, DirBadge, PnlText, RText, Modal, Btn, Tabs, Sep, Empty, Chip,
@@ -15,9 +15,16 @@ const ENTRY_MODELS = [
 
 const SESSIONS = ['London', 'NY AM Kill Zone', 'NY Lunch', 'NY PM', 'Asia', 'Other'];
 
-function TradeCard({ trade, onClick, onDelete, draggable, isDragging, isDragOver, onDragStart, onDragOver, onDrop, onDragEnd }) {
-  const { date, time, instrument, direction, result, pnlDollars, rMultiple, screenshotUrl, entryModel, accounts } = trade;
-  const accountLabel = accounts?.map(a => a.name).join(', ') || '—';
+function TradeCard({ trade, onClick, onDelete, accountFilter, draggable, isDragging, isDragOver, onDragStart, onDragOver, onDrop, onDragEnd }) {
+  const { date, time, instrument, direction, result, rMultiple, screenshotUrl, entryModel, accounts } = trade;
+  // Account label respects the filter — only the in-scope ones, with their contract counts.
+  const inScope = accountFilter == null
+    ? (accounts || [])
+    : (accounts || []).filter(a => accountFilter.includes(a.name));
+  const accountLabel = inScope.length
+    ? inScope.map(a => `${a.name}${a.contracts > 1 ? ` ×${a.contracts}` : ''}`).join(', ')
+    : '—';
+  const cardPnl = effectivePnl(trade, accountFilter);
 
   const handleDelete = (e) => {
     e.stopPropagation();
@@ -63,7 +70,7 @@ function TradeCard({ trade, onClick, onDelete, draggable, isDragging, isDragOver
         </div>
         <div style={{ fontSize: 12, color: 'var(--text2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{entryModel}</div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-          <PnlText value={pnlDollars} size={16}/>
+          <PnlText value={cardPnl} size={16}/>
           <RText value={rMultiple}/>
         </div>
         <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{accountLabel}</div>
@@ -170,6 +177,23 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
     handleImage(e.dataTransfer.files[0]);
   };
 
+  const handlePaste = (e) => {
+    const target = e.target;
+    const tag = target?.tagName?.toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || target?.isContentEditable) return;
+    const items = e.clipboardData?.items || [];
+    for (const item of items) {
+      if (item.type && item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          handleImage(file);
+          return;
+        }
+      }
+    }
+  };
+
   const handleSave = () => {
     const t = { ...trade, rMultiple: parseFloat(trade.rMultiple) || 0, pnlDollars: parseFloat(trade.pnlDollars) || 0 };
     onSave(t);
@@ -192,10 +216,11 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
         </>
       }
     >
-      <Tabs tabs={['Details', 'Outlook', 'Confluences', 'Rules', 'Review']} active={tab} onChange={setTab}/>
+      <div onPaste={handlePaste}>
+        <Tabs tabs={['Details', 'Outlook', 'Confluences', 'Rules', 'Review']} active={tab} onChange={setTab}/>
 
-      {tab === 'Details' && (
-        <div style={{ marginTop: 20 }}>
+        {tab === 'Details' && (
+          <div style={{ marginTop: 20 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 14 }}>
             <FInput label="Date" type="date" value={trade.date} onChange={v => set('date', v)}/>
             <FInput label="Time (NY)" type="time" value={trade.time} onChange={v => set('time', v)}/>
@@ -244,6 +269,7 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)}
             onDrop={handleDrop}
+            onPaste={handlePaste}
           >
             {trade.screenshotUrl ? (
               <div>
@@ -258,17 +284,17 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
             ) : (
               <>
                 <Icon name="upload" size={24}/>
-                <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text2)' }}>Drop chart screenshot here or click to upload</div>
+                <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text2)' }}>Drop or paste chart screenshot, or click to upload</div>
                 <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>PNG, JPG — auto-compressed</div>
               </>
             )}
           </div>
           <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handleImage(e.target.files[0])}/>
         </div>
-      )}
+        )}
 
-      {tab === 'Outlook' && (
-        <div style={{ marginTop: 20 }}>
+        {tab === 'Outlook' && (
+          <div style={{ marginTop: 20 }}>
           <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>
             Pre-session context. Upload your MNQ and MES charts side by side, then note your bias and key levels below.
           </p>
@@ -291,11 +317,11 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
             placeholder="HTF narrative, key levels to watch, DOLs in draw, session expectations, SMT levels on MNQ vs MES..."
             rows={5}
           />
-        </div>
-      )}
+          </div>
+        )}
 
-      {tab === 'Confluences' && (
-        <div style={{ marginTop: 20 }}>
+        {tab === 'Confluences' && (
+          <div style={{ marginTop: 20 }}>
           <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>
             Check all confluences that were present for this trade. Edit this list on the <strong style={{ color: 'var(--text2)' }}>Confluences</strong> page.
           </p>
@@ -324,11 +350,11 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
               {trade.confluences.map(c => <Chip key={c} label={c} accent/>)}
             </div>
           )}
-        </div>
-      )}
+          </div>
+        )}
 
-      {tab === 'Rules' && (
-        <div style={{ marginTop: 20 }}>
+        {tab === 'Rules' && (
+          <div style={{ marginTop: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
             <p style={{ fontSize: 12, color: 'var(--text2)' }}>Check each rule that was followed for this trade.</p>
             <div style={{ fontFamily: 'var(--mono)', fontSize: 13, color: trade.rulesScore >= 80 ? 'var(--bull)' : trade.rulesScore >= 60 ? 'var(--accent)' : 'var(--bear)' }}>
@@ -353,19 +379,20 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
               ))}
             </div>
           ))}
-        </div>
-      )}
+          </div>
+        )}
 
-      {tab === 'Review' && (
-        <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {tab === 'Review' && (
+          <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <FTextarea label="Trade Review — What happened?" value={trade.review} onChange={v => set('review', v)}
             placeholder="Describe the trade: what you saw, how you entered, how it played out..." rows={5}/>
           <FTextarea label="Lesson / Key Takeaway" value={trade.lesson} onChange={v => set('lesson', v)}
             placeholder="What does this trade teach you? What would you do differently?" rows={4}/>
-        </div>
-      )}
+          </div>
+        )}
 
-      {zoomImage && <Lightbox src={zoomImage.src} caption={zoomImage.caption} onClose={() => setZoomImage(null)}/>}
+        {zoomImage && <Lightbox src={zoomImage.src} caption={zoomImage.caption} onClose={() => setZoomImage(null)}/>}
+      </div>
     </Modal>
   );
 }
@@ -463,8 +490,8 @@ export default function Journal({ rules, settings, openTradeId, onOpenHandled, a
   }
   if (sort === 'newest') visible.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   else if (sort === 'oldest') visible.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-  else if (sort === 'pnl-hi') visible.sort((a, b) => b.pnlDollars - a.pnlDollars);
-  else if (sort === 'pnl-lo') visible.sort((a, b) => a.pnlDollars - b.pnlDollars);
+  else if (sort === 'pnl-hi') visible.sort((a, b) => effectivePnl(b, accountFilter) - effectivePnl(a, accountFilter));
+  else if (sort === 'pnl-lo') visible.sort((a, b) => effectivePnl(a, accountFilter) - effectivePnl(b, accountFilter));
   else if (sort === 'manual') {
     const order = Store.getTradeOrder() || [];
     const indexOf = (id) => { const i = order.indexOf(id); return i === -1 ? order.length : i; };
@@ -550,6 +577,7 @@ export default function Journal({ rules, settings, openTradeId, onOpenHandled, a
           {visible.map(t => (
             <TradeCard
               key={t.id} trade={t} onClick={setSelected} onDelete={handleDelete}
+              accountFilter={accountFilter}
               draggable
               isDragging={draggingId === t.id}
               isDragOver={dragOverId === t.id && draggingId !== t.id}
