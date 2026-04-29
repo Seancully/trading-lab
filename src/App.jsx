@@ -149,8 +149,8 @@ function Dashboard({ onNav, accountFilter }) {
   const monthStr  = today.slice(0, 7);
 
   const todayTrades  = trades.filter(t => t.date === today);
-  const weekTrades   = trades.filter(t => t.date >= weekStr);
-  const monthTrades  = trades.filter(t => t.date.startsWith(monthStr));
+  const weekTrades   = trades.filter(t => (t.date || '') >= weekStr);
+  const monthTrades  = trades.filter(t => (t.date || '').startsWith(monthStr));
 
   const todayPnl  = todayTrades.reduce((s, t) => s + (t.pnlDollars || 0), 0);
   const weekPnl   = weekTrades.reduce((s, t) => s + (t.pnlDollars || 0), 0);

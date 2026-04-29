@@ -530,7 +530,7 @@ export default function Performance({ accountFilter }) {
     else if (period === '30d') cutoff.setDate(now.getDate() - 30);
     else if (period === '90d') cutoff.setDate(now.getDate() - 90);
     const cutStr = cutoff.toISOString().slice(0, 10);
-    return trades.filter(t => t.date >= cutStr);
+    return trades.filter(t => (t.date || '') >= cutStr);
   }, [trades, period]);
 
   const stats = useMemo(() => calcStats(filtered), [filtered]);
