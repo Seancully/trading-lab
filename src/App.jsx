@@ -9,6 +9,7 @@ import Toaster from './components/Toaster.jsx';
 import AnimatedNumber from './components/AnimatedNumber.jsx';
 import Sparkline from './components/Sparkline.jsx';
 import CommandPalette from './components/CommandPalette.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import Login from './pages/Login.jsx';
 import Journal from './pages/Journal.jsx';
 import Rules from './pages/Rules.jsx';
@@ -555,7 +556,8 @@ export default function App() {
           )}
         </div>
 
-        <div className="main-content page-transition" key={page}>
+        <ErrorBoundary key={page}>
+        <div className="main-content page-transition">
           {page === 'dashboard'   && <Dashboard onNav={setPage} accountFilter={accountFilter}/>}
           {page === 'journal'     && (
             <Journal
@@ -580,6 +582,7 @@ export default function App() {
             );
           })()}
         </div>
+        </ErrorBoundary>
       </main>
 
       {showSettings && (

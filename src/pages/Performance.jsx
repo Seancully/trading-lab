@@ -22,7 +22,7 @@ export function calcStats(trades) {
     : null;
 
   let peak = 0, running = 0, maxDD = 0;
-  const sorted = [...trades].sort((a, b) => a.date.localeCompare(b.date));
+  const sorted = [...trades].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   for (const t of sorted) {
     running += Number(t.pnlDollars) || 0;
     if (running > peak) peak = running;
@@ -37,7 +37,7 @@ export function calcStats(trades) {
   const worstDay = dayVals.length ? Math.min(...dayVals) : 0;
 
   let streak = 0, streakType = 'Win';
-  const byDate = [...trades].sort((a, b) => b.date.localeCompare(a.date));
+  const byDate = [...trades].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   if (byDate.length) {
     streakType = byDate[0].result;
     for (const t of byDate) {
@@ -183,7 +183,7 @@ export function EquityCurve({ equity }) {
       ctx.fillStyle = colorText3;
       ctx.font = '9px JetBrains Mono, monospace';
       ctx.textAlign = 'center';
-      for (const i of dateIdxs) ctx.fillText(equity[i].date.slice(5), xOf(i), H - 8);
+      for (const i of dateIdxs) ctx.fillText((equity[i].date || '').slice(5), xOf(i), H - 8);
     };
 
     draw();

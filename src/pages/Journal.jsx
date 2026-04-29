@@ -461,8 +461,8 @@ export default function Journal({ rules, settings, openTradeId, onOpenHandled, a
       t.accounts?.some(a => a.name.toLowerCase().includes(q))
     );
   }
-  if (sort === 'newest') visible.sort((a, b) => b.date.localeCompare(a.date));
-  else if (sort === 'oldest') visible.sort((a, b) => a.date.localeCompare(b.date));
+  if (sort === 'newest') visible.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  else if (sort === 'oldest') visible.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   else if (sort === 'pnl-hi') visible.sort((a, b) => b.pnlDollars - a.pnlDollars);
   else if (sort === 'pnl-lo') visible.sort((a, b) => a.pnlDollars - b.pnlDollars);
   else if (sort === 'manual') {
