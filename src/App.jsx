@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Store, Sync } from './lib/store.js';
 import { supabaseConfigured } from './lib/supabase.js';
 import { toast } from './lib/toast.js';
@@ -12,6 +12,7 @@ import CommandPalette from './components/CommandPalette.jsx';
 import Login from './pages/Login.jsx';
 import Journal from './pages/Journal.jsx';
 import Rules from './pages/Rules.jsx';
+import Confluences from './pages/Confluences.jsx';
 import Setups from './pages/Setups.jsx';
 import Performance, { calcStats, EquityCurve, CalendarView } from './pages/Performance.jsx';
 
@@ -19,6 +20,7 @@ const NAV = [
   { id: 'dashboard',   label: 'Dashboard',    icon: 'dashboard' },
   { id: 'journal',     label: 'Journal',      icon: 'journal' },
   { id: 'rules',       label: 'My Rules',     icon: 'rules' },
+  { id: 'confluences', label: 'Confluences',  icon: 'rules' },
   { id: 'setups',      label: 'A+ Setups',    icon: 'setups' },
   { id: 'performance', label: 'Performance',  icon: 'perf' },
   { id: 'calendar',    label: 'Calendar',     icon: 'calendar' },
@@ -28,10 +30,70 @@ const PAGE_SUB = {
   dashboard:   'ICT Framework · MNQ / MES',
   journal:     'All logged trades · click to open',
   rules:       'Your trading rulebook — auto-saved',
+  confluences: 'Confluences shown when logging a trade',
   setups:      'HTF PDA · IFVG · Internal/External · SMT',
   performance: 'Metrics, equity curve, model breakdown',
   calendar:    'Monthly P&L · Mon–Fri view',
 };
+
+function applyAccountFilter(trades, filter) {
+  if (!filter || !filter.length) return trades;
+  return trades.filter(t => t.accounts?.some(a => filter.includes(a.name)));
+}
+
+function AccountFilterPill({ accounts, value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef();
+
+  useEffect(() => {
+    if (!open) return;
+    const fn = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', fn);
+    return () => document.removeEventListener('mousedown', fn);
+  }, [open]);
+
+  const active = value && value.length;
+  const label = !active
+    ? 'All accounts'
+    : value.length === 1 ? value[0]
+    : `${value.length} accounts`;
+
+  const toggle = (acc) => {
+    const set = new Set(value || []);
+    if (set.has(acc)) set.delete(acc); else set.add(acc);
+    const next = [...set];
+    onChange(next.length === accounts.length ? null : next.length ? next : null);
+  };
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button className={`account-filter-pill ${active ? 'active' : ''}`} onClick={() => setOpen(o => !o)} title="Filter by account">
+        <Icon name="settings" size={11}/>
+        <span style={{ maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+      </button>
+      {open && (
+        <div className="account-filter-menu">
+          <div style={{ fontSize: 10, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.1em', padding: '6px 10px 4px' }}>
+            Show trades from
+          </div>
+          {accounts.map(acc => {
+            const checked = !value || value.includes(acc);
+            return (
+              <label key={acc} className="menu-row">
+                <input type="checkbox" checked={checked} onChange={() => toggle(acc)}/>
+                <span>{acc}</span>
+              </label>
+            );
+          })}
+          <div className="menu-foot">
+            <button onClick={() => onChange(null)}>All</button>
+            <button onClick={() => onChange([])}>None</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function PnlChip({ value, label }) {
   const pos = value > 0, neg = value < 0;
@@ -50,8 +112,9 @@ function PnlChip({ value, label }) {
   );
 }
 
-function Dashboard({ onNav }) {
-  const trades = useMemo(() => Store.getTrades(), []);
+function Dashboard({ onNav, accountFilter }) {
+  const allTrades = useMemo(() => Store.getTrades(), []);
+  const trades = useMemo(() => applyAccountFilter(allTrades, accountFilter), [allTrades, accountFilter]);
   const stats  = useMemo(() => calcStats(trades), [trades]);
   const recent = trades.slice(0, 6);
 
@@ -252,6 +315,12 @@ export default function App() {
   const [rules, setRules]         = useState(() => Store.getRules());
   const [syncStatus, setSyncStatus] = useState(Sync.status);
   const [openTradeId, setOpenTradeId] = useState(null);
+  const [accountFilter, setAccountFilter] = useState(() => Store.getAccountFilter());
+
+  const handleAccountFilterChange = (next) => {
+    setAccountFilter(next);
+    Store.saveAccountFilter(next);
+  };
 
   useEffect(() => {
     document.body.className = theme === 'light' ? 'light' : '';
@@ -407,6 +476,13 @@ export default function App() {
             <Icon name="search" size={11}/>
             <kbd className="kbd">⌘K</kbd>
           </button>
+          {settings.accounts?.length > 0 && (
+            <AccountFilterPill
+              accounts={settings.accounts}
+              value={accountFilter}
+              onChange={handleAccountFilterChange}
+            />
+          )}
           <SyncBadge status={syncStatus} hasUser={!!user} />
 
           <button className="icon-btn" onClick={toggleTheme} title={theme === 'dark' ? 'Light mode' : 'Dark mode'}>
@@ -456,23 +532,29 @@ export default function App() {
         </div>
 
         <div className="main-content page-transition" key={page}>
-          {page === 'dashboard'   && <Dashboard onNav={setPage}/>}
+          {page === 'dashboard'   && <Dashboard onNav={setPage} accountFilter={accountFilter}/>}
           {page === 'journal'     && (
             <Journal
               rules={rules}
               settings={settings}
               openTradeId={openTradeId}
               onOpenHandled={() => setOpenTradeId(null)}
+              accountFilter={accountFilter}
             />
           )}
           {page === 'rules'       && <Rules/>}
+          {page === 'confluences' && <Confluences/>}
           {page === 'setups'      && <Setups/>}
-          {page === 'performance' && <Performance/>}
-          {page === 'calendar'    && (
-            <div className="card">
-              <CalendarView byDay={calcStats(Store.getTrades())?.byDay || {}} trades={Store.getTrades()}/>
-            </div>
-          )}
+          {page === 'performance' && <Performance accountFilter={accountFilter}/>}
+          {page === 'calendar'    && (() => {
+            const filtered = applyAccountFilter(Store.getTrades(), accountFilter);
+            const byDay = calcStats(filtered)?.byDay || {};
+            return (
+              <div className="card">
+                <CalendarView byDay={byDay} trades={filtered}/>
+              </div>
+            );
+          })()}
         </div>
       </main>
 

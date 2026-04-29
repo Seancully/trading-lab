@@ -6,11 +6,15 @@ import { supabase, supabaseConfigured } from './supabase.js';
 
 const KEYS = {
   trades: 'tl_trades',
+  tradeOrder: 'tl_trade_order',
   rules: 'tl_rules',
   rulesVersion: 'tl_rules_version',
+  confluences: 'tl_confluences',
+  confluencesVersion: 'tl_confluences_version',
   setups: 'tl_setups',
   settings: 'tl_settings',
   notes: 'tl_notes',
+  accountFilter: 'tl_account_filter',
 };
 
 export function uid() {
@@ -100,6 +104,41 @@ const DEFAULT_SETTINGS = {
   accounts: ['MNQ Main', 'MES Hedge', 'Apex Eval'],
   defaultRisk: 150,
 };
+
+// ── Default confluences ─────────────────────────────────────────────────────
+const DEFAULT_CONFLUENCES_VERSION = 1;
+const DEFAULT_CONFLUENCES = [
+  { id: 'cnf-htf', category: 'HTF Context', items: [
+    { id: uid(), text: 'HTF PDA Alignment' },
+    { id: uid(), text: 'Strong DOL in Draw' },
+    { id: uid(), text: 'Aligns with HTF narrative' },
+  ]},
+  { id: 'cnf-liq', category: 'Liquidity', items: [
+    { id: uid(), text: 'Internal BSL Swept' },
+    { id: uid(), text: 'Internal SSL Swept' },
+    { id: uid(), text: 'External BSL Target' },
+    { id: uid(), text: 'External SSL Target' },
+    { id: uid(), text: 'LRL Respected' },
+    { id: uid(), text: 'Inducement Visible' },
+  ]},
+  { id: 'cnf-entry', category: 'Entry Triggers', items: [
+    { id: uid(), text: 'IFVG Present' },
+    { id: uid(), text: 'Displacement Confirmed' },
+    { id: uid(), text: 'OB Mitigation' },
+    { id: uid(), text: 'FVG Mitigated' },
+    { id: uid(), text: 'BPR Present' },
+  ]},
+  { id: 'cnf-conf', category: 'Confirmation', items: [
+    { id: uid(), text: 'SMT Confirmed' },
+    { id: uid(), text: 'ES correlation intact' },
+  ]},
+  { id: 'cnf-sess', category: 'Session', items: [
+    { id: uid(), text: 'Session Timing Correct' },
+    { id: uid(), text: 'London Open' },
+    { id: uid(), text: 'NY Open Kill Zone' },
+    { id: uid(), text: '2022 Opening Range' },
+  ]},
+];
 
 function makeSample() {
   const today = new Date();
@@ -236,6 +275,16 @@ export const Sync = {
       const remoteRules = await this.pull('rules');
       if (remoteRules) localStorage.setItem(KEYS.rules, JSON.stringify(remoteRules));
       else await this.push('rules', Store.getRules());
+      // Confluences
+      const remoteCnf = await this.pull('confluences');
+      if (remoteCnf) localStorage.setItem(KEYS.confluences, JSON.stringify(remoteCnf));
+      else await this.push('confluences', Store.getConfluences());
+      // Trade order
+      const remoteOrder = await this.pull('trade_order');
+      if (Array.isArray(remoteOrder)) localStorage.setItem(KEYS.tradeOrder, JSON.stringify(remoteOrder));
+      // Account filter
+      const remoteFilter = await this.pull('account_filter');
+      if (Array.isArray(remoteFilter) && remoteFilter.length) localStorage.setItem(KEYS.accountFilter, JSON.stringify(remoteFilter));
       // Settings
       const remoteSettings = await this.pull('settings');
       if (remoteSettings) {
@@ -350,6 +399,44 @@ export const Store = {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('tl:rulesUpdated', { detail: rules }));
     }
+  },
+
+  // ── Confluences (categorized list, edited from the Confluences page) ──
+  getConfluences() {
+    const version = read(KEYS.confluencesVersion, 0);
+    const stored = read(KEYS.confluences, null);
+    if (!stored || version !== DEFAULT_CONFLUENCES_VERSION) {
+      localStorage.setItem(KEYS.confluences, JSON.stringify(DEFAULT_CONFLUENCES));
+      localStorage.setItem(KEYS.confluencesVersion, JSON.stringify(DEFAULT_CONFLUENCES_VERSION));
+      Sync.push('confluences', DEFAULT_CONFLUENCES);
+      Sync.push('confluences_version', DEFAULT_CONFLUENCES_VERSION);
+      return DEFAULT_CONFLUENCES;
+    }
+    return stored;
+  },
+  saveConfluences(cnf) {
+    localStorage.setItem(KEYS.confluences, JSON.stringify(cnf));
+    localStorage.setItem(KEYS.confluencesVersion, JSON.stringify(DEFAULT_CONFLUENCES_VERSION));
+    Sync.push('confluences', cnf);
+    Sync.push('confluences_version', DEFAULT_CONFLUENCES_VERSION);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('tl:confluencesUpdated', { detail: cnf }));
+    }
+  },
+
+  // ── Manual trade order (array of trade IDs) ──────────────────────────────
+  getTradeOrder() { return read(KEYS.tradeOrder, null); },
+  saveTradeOrder(order) {
+    localStorage.setItem(KEYS.tradeOrder, JSON.stringify(order));
+    Sync.push('trade_order', order);
+  },
+
+  // ── Account filter (array of account names; null = all) ──────────────────
+  getAccountFilter() { return read(KEYS.accountFilter, null); },
+  saveAccountFilter(filter) {
+    if (filter && filter.length) localStorage.setItem(KEYS.accountFilter, JSON.stringify(filter));
+    else localStorage.removeItem(KEYS.accountFilter);
+    Sync.push('account_filter', filter || []);
   },
 
   getNotes() { return read(KEYS.notes, DEFAULT_NOTES); },

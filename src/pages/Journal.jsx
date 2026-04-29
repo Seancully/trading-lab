@@ -5,14 +5,7 @@ import {
   Icon, Badge, DirBadge, PnlText, RText, Modal, Btn, Tabs, Sep, Empty, Chip,
   FInput, FSelect, FTextarea,
 } from '../components/Shared.jsx';
-
-const CONFLUENCE_OPTIONS = [
-  'HTF PDA Alignment', 'IFVG Present', 'SMT Confirmed', 'Strong DOL in Draw',
-  'Internal BSL Swept', 'Internal SSL Swept', 'External BSL Target', 'External SSL Target',
-  'LRL Respected', 'Displacement Confirmed', 'Inducement Visible',
-  'Session Timing Correct', 'London Open', 'NY Open Kill Zone',
-  '2022 Opening Range', 'OB Mitigation', 'FVG Mitigated', 'BPR Present',
-];
+import Lightbox from '../components/Lightbox.jsx';
 
 const ENTRY_MODELS = [
   'HTF PDA → IFVG', 'Internal → External (Sweep Short)', 'Internal → External (Sweep Long)',
@@ -22,7 +15,7 @@ const ENTRY_MODELS = [
 
 const SESSIONS = ['London', 'NY AM Kill Zone', 'NY Lunch', 'NY PM', 'Asia', 'Other'];
 
-function TradeCard({ trade, onClick, onDelete }) {
+function TradeCard({ trade, onClick, onDelete, draggable, isDragging, isDragOver, onDragStart, onDragOver, onDrop, onDragEnd }) {
   const { date, time, instrument, direction, result, pnlDollars, rMultiple, screenshotUrl, entryModel, accounts } = trade;
   const accountLabel = accounts?.map(a => a.name).join(', ') || '—';
 
@@ -32,7 +25,15 @@ function TradeCard({ trade, onClick, onDelete }) {
   };
 
   return (
-    <div className="trade-card" onClick={() => onClick(trade)}>
+    <div
+      className={`trade-card ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
+      onClick={() => onClick(trade)}
+      draggable={!!draggable}
+      onDragStart={(e) => onDragStart?.(e, trade.id)}
+      onDragOver={(e) => onDragOver?.(e, trade.id)}
+      onDrop={(e) => onDrop?.(e, trade.id)}
+      onDragEnd={onDragEnd}
+    >
       <div className="quick-actions">
         <button className="quick-action-btn danger" onClick={handleDelete} title="Delete trade">
           <Icon name="trash" size={12}/>
@@ -115,7 +116,15 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
   const [trade, setTrade] = useState(initTrade || emptyTrade);
   const [tab, setTab] = useState('Details');
   const [dragging, setDragging] = useState(false);
+  const [confluenceGroups, setConfluenceGroups] = useState(() => Store.getConfluences());
+  const [zoomImage, setZoomImage] = useState(null);
   const fileRef = useRef();
+
+  useEffect(() => {
+    const fn = (e) => { if (Array.isArray(e.detail)) setConfluenceGroups(e.detail); };
+    window.addEventListener('tl:confluencesUpdated', fn);
+    return () => window.removeEventListener('tl:confluencesUpdated', fn);
+  }, []);
 
   const set = (key, val) => setTrade(t => ({ ...t, [key]: val }));
 
@@ -238,8 +247,13 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
           >
             {trade.screenshotUrl ? (
               <div>
-                <img src={trade.screenshotUrl} alt="chart" style={{ maxHeight: 220, maxWidth: '100%', borderRadius: 6 }}/>
-                <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text2)' }}>Click or drag to replace</div>
+                <img
+                  src={trade.screenshotUrl}
+                  alt="chart"
+                  className="lightbox-trigger"
+                  onClick={(e) => { e.stopPropagation(); setZoomImage({ src: trade.screenshotUrl, caption: `Chart — ${trade.date}${trade.time ? ' · ' + trade.time : ''}` }); }}
+                  style={{ maxHeight: 220, maxWidth: '100%', borderRadius: 6 }}/>
+                <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text2)' }}>Click image to zoom · click outside to replace</div>
               </div>
             ) : (
               <>
@@ -265,7 +279,8 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
               { key: 'mesImageUrl', label: 'MES — Correlation' },
             ].map(({ key, label }) => (
               <OutlookUpload key={key} label={label} url={trade.outlook?.[key]}
-                onChange={url => set('outlook', { ...(trade.outlook || {}), [key]: url })}/>
+                onChange={url => set('outlook', { ...(trade.outlook || {}), [key]: url })}
+                onZoom={(src) => setZoomImage({ src, caption: `${label} — ${trade.date}` })}/>
             ))}
           </div>
 
@@ -282,18 +297,30 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
       {tab === 'Confluences' && (
         <div style={{ marginTop: 20 }}>
           <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>
-            Check all confluences that were present for this trade. More checks = more conviction, but quality over quantity.
+            Check all confluences that were present for this trade. Edit this list on the <strong style={{ color: 'var(--text2)' }}>Confluences</strong> page.
           </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 2 }}>
-            {CONFLUENCE_OPTIONS.map(c => (
-              <label key={c} className="checkbox-item">
-                <input type="checkbox" checked={(trade.confluences || []).includes(c)} onChange={() => handleConfluence(c)}/>
-                <span>{c}</span>
-              </label>
-            ))}
-          </div>
+          {confluenceGroups.length === 0 ? (
+            <Empty icon="✓" title="No confluences defined" desc="Add some on the Confluences page to start ticking them here."/>
+          ) : confluenceGroups.map(cat => (
+            <div key={cat.id} style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text3)', marginBottom: 6 }}>
+                {cat.category}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 2 }}>
+                {cat.items.map(item => (
+                  <label key={item.id} className="checkbox-item">
+                    <input
+                      type="checkbox"
+                      checked={(trade.confluences || []).includes(item.text)}
+                      onChange={() => handleConfluence(item.text)}/>
+                    <span>{item.text}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
           {trade.confluences?.length > 0 && (
-            <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {trade.confluences.map(c => <Chip key={c} label={c} accent/>)}
             </div>
           )}
@@ -337,11 +364,13 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
             placeholder="What does this trade teach you? What would you do differently?" rows={4}/>
         </div>
       )}
+
+      {zoomImage && <Lightbox src={zoomImage.src} caption={zoomImage.caption} onClose={() => setZoomImage(null)}/>}
     </Modal>
   );
 }
 
-function OutlookUpload({ label, url, onChange }) {
+function OutlookUpload({ label, url, onChange, onZoom }) {
   const ref = useRef();
   const [hover, setHover] = useState(false);
   return (
@@ -354,13 +383,17 @@ function OutlookUpload({ label, url, onChange }) {
       >
         {url ? (
           <>
-            <img src={url} alt={label} style={{ width: '100%', display: 'block', borderRadius: 8 }}/>
+            <img
+              src={url} alt={label}
+              className="lightbox-trigger"
+              onClick={(e) => { e.stopPropagation(); onZoom?.(url); }}
+              style={{ width: '100%', display: 'block', borderRadius: 8 }}/>
             <div style={{
               position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               opacity: hover ? 1 : 0, transition: 'opacity 0.15s', borderRadius: 8,
-              fontSize: 12, color: '#fff',
-            }}>Click to replace</div>
+              fontSize: 12, color: '#fff', pointerEvents: 'none',
+            }}>Click image to zoom</div>
           </>
         ) : (
           <>
@@ -379,13 +412,15 @@ function OutlookUpload({ label, url, onChange }) {
   );
 }
 
-export default function Journal({ rules, settings, openTradeId, onOpenHandled }) {
+export default function Journal({ rules, settings, openTradeId, onOpenHandled, accountFilter }) {
   const [trades, setTrades] = useState(() => Store.getTrades());
   const [selected, setSelected] = useState(null);
   const [adding, setAdding] = useState(false);
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState('newest');
+  const [sort, setSort] = useState(() => Store.getTradeOrder() ? 'manual' : 'newest');
+  const [draggingId, setDraggingId] = useState(null);
+  const [dragOverId, setDragOverId] = useState(null);
 
   useEffect(() => {
     const fn = () => setAdding(true);
@@ -412,6 +447,9 @@ export default function Journal({ rules, settings, openTradeId, onOpenHandled })
   };
 
   let visible = [...trades];
+  if (accountFilter && accountFilter.length) {
+    visible = visible.filter(t => t.accounts?.some(a => accountFilter.includes(a.name)));
+  }
   if (filter !== 'All') visible = visible.filter(t => t.result === filter);
   if (search) {
     const q = search.toLowerCase();
@@ -426,6 +464,43 @@ export default function Journal({ rules, settings, openTradeId, onOpenHandled })
   else if (sort === 'oldest') visible.sort((a, b) => a.date.localeCompare(b.date));
   else if (sort === 'pnl-hi') visible.sort((a, b) => b.pnlDollars - a.pnlDollars);
   else if (sort === 'pnl-lo') visible.sort((a, b) => a.pnlDollars - b.pnlDollars);
+  else if (sort === 'manual') {
+    const order = Store.getTradeOrder() || [];
+    const indexOf = (id) => { const i = order.indexOf(id); return i === -1 ? order.length : i; };
+    visible.sort((a, b) => indexOf(a.id) - indexOf(b.id));
+  }
+
+  // Drag-to-reorder. Only meaningful in 'manual' sort, but switching the user
+  // to manual on first drag is friendly.
+  const handleDragStart = (e, id) => {
+    setDraggingId(id);
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', id); } catch { /* noop */ }
+  };
+  const handleDragOver = (e, id) => {
+    e.preventDefault();
+    if (id !== dragOverId) setDragOverId(id);
+  };
+  const handleDrop = (e, targetId) => {
+    e.preventDefault();
+    const sourceId = draggingId;
+    setDraggingId(null); setDragOverId(null);
+    if (!sourceId || sourceId === targetId) return;
+    // Build new order from currently-visible list (so the reorder is intuitive)
+    const ids = visible.map(t => t.id);
+    const from = ids.indexOf(sourceId);
+    const to = ids.indexOf(targetId);
+    if (from === -1 || to === -1) return;
+    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    // Append any trades not in the visible set so we keep their relative order at the end
+    const tail = trades.filter(t => !ids.includes(t.id)).map(t => t.id);
+    const newOrder = [...ids, ...tail];
+    Store.saveTradeOrder(newOrder);
+    if (sort !== 'manual') setSort('manual');
+    setTrades([...trades]); // force re-render with new order
+    toast.info('Order saved');
+  };
+  const handleDragEnd = () => { setDraggingId(null); setDragOverId(null); };
 
   return (
     <div>
@@ -433,11 +508,12 @@ export default function Journal({ rules, settings, openTradeId, onOpenHandled })
         <Tabs tabs={['All', 'Win', 'Loss', 'BE']} active={filter} onChange={setFilter}/>
         <input className="form-input" style={{ width: 200, marginBottom: 0 }} placeholder="Search trades..."
           value={search} onChange={e => setSearch(e.target.value)}/>
-        <select className="form-select" style={{ width: 130 }} value={sort} onChange={e => setSort(e.target.value)}>
+        <select className="form-select" style={{ width: 150 }} value={sort} onChange={e => setSort(e.target.value)}>
           <option value="newest">Newest first</option>
           <option value="oldest">Oldest first</option>
           <option value="pnl-hi">P&L ↑</option>
           <option value="pnl-lo">P&L ↓</option>
+          <option value="manual">Manual order</option>
         </select>
         <div style={{ flex: 1 }}/>
         <div style={{ fontSize: 12, color: 'var(--text3)' }}>{visible.length} trade{visible.length !== 1 ? 's' : ''}</div>
@@ -471,7 +547,15 @@ export default function Journal({ rules, settings, openTradeId, onOpenHandled })
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 }}>
           {visible.map(t => (
-            <TradeCard key={t.id} trade={t} onClick={setSelected} onDelete={handleDelete}/>
+            <TradeCard
+              key={t.id} trade={t} onClick={setSelected} onDelete={handleDelete}
+              draggable
+              isDragging={draggingId === t.id}
+              isDragOver={dragOverId === t.id && draggingId !== t.id}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              onDragEnd={handleDragEnd}/>
           ))}
         </div>
       )}

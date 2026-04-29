@@ -511,10 +511,15 @@ function EquityCard({ title, subtitle, equity = [], height, empty, totalPnl, max
 }
 
 // ── Performance main ──────────────────────────────────────────────────────────
-export default function Performance() {
-  const [trades] = useState(() => Store.getTrades());
+export default function Performance({ accountFilter }) {
+  const [allTrades] = useState(() => Store.getTrades());
   const [tab, setTab] = useState('Overview');
   const [period, setPeriod] = useState('All');
+
+  const trades = useMemo(() => {
+    if (!accountFilter || !accountFilter.length) return allTrades;
+    return allTrades.filter(t => t.accounts?.some(a => accountFilter.includes(a.name)));
+  }, [allTrades, accountFilter]);
 
   const filtered = useMemo(() => {
     if (period === 'All') return trades;

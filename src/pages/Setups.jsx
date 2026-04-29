@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Store } from '../lib/store.js';
 import { Icon, Btn } from '../components/Shared.jsx';
+import SelectionToolbar from '../components/SelectionToolbar.jsx';
 
 const BLOCK_TYPES = [
   { type: 'p',    icon: '¶',    label: 'Text',      desc: 'Plain paragraph' },
@@ -56,6 +57,7 @@ const Block = React.forwardRef(function Block({
   onInput,
   onKeyDown,
   onImageUpload,
+  onPasteImage,
   isFocused,
   isDragOver,
   onFocus,
@@ -142,6 +144,21 @@ const Block = React.forwardRef(function Block({
       block.type === 'code' ? 'Code...' : "Type '/' for commands")
     : '';
 
+  const handlePaste = (e) => {
+    if (!onPasteImage || block.type === 'img') return;
+    const items = e.clipboardData?.items || [];
+    for (const item of items) {
+      if (item.type && item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          onPasteImage(file, block.id);
+          return;
+        }
+      }
+    }
+  };
+
   return (
     <div className={`block-row ${isFocused ? 'is-focused' : ''} ${isDragOver ? 'is-over' : ''}`}>
       <div
@@ -162,6 +179,7 @@ const Block = React.forwardRef(function Block({
         style={{ ...getBlockStyle(block.type), flex: 1 }}
         onInput={onInput}
         onKeyDown={onKeyDown}
+        onPaste={handlePaste}
         onFocus={onFocus}
         onBlur={onBlur}
         onDragOver={(e) => onDragOver?.(e, block.id)}
@@ -236,6 +254,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
   const [titleFocused, setTitleFocused] = useState(false);
   const [dragOverId, setDragOverId] = useState(null);
   const blockRefs  = useRef({});
+  const bodyRef    = useRef(null);
   const saveTimer  = useRef(null);
   const titleRef = useRef(null);
   const dragId = useRef(null);
@@ -435,6 +454,12 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
     moveBlock(from, id);
   };
 
+  const handlePasteImage = async (file, id) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    const imageUrl = await Store.compressImage(file);
+    setBlocks(bs => bs.map(b => b.id === id ? { ...b, type: 'img', imageUrl, text: '' } : b));
+  };
+
   const handleDragEnd = () => {
     dragId.current = null;
     setDragOverId(null);
@@ -462,7 +487,31 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
         </button>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '36px 52px 80px' }}>
+      <div
+        ref={bodyRef}
+        style={{ flex: 1, overflowY: 'auto', padding: '36px 52px 80px' }}
+        onPaste={async (e) => {
+          // Paste-image-anywhere: detect image in clipboard, insert as new img block.
+          const items = e.clipboardData?.items || [];
+          for (const item of items) {
+            if (item.type && item.type.startsWith('image/')) {
+              const file = item.getAsFile();
+              if (!file) continue;
+              e.preventDefault();
+              const url = await Store.compressImage(file);
+              const nb = { id: Store.uid(), type: 'img', text: '', imageUrl: url };
+              setBlocks(bs => {
+                // Insert after focused block if any, else at end
+                const idx = bs.findIndex(b => b.id === focusedId);
+                const next = [...bs];
+                if (idx >= 0) next.splice(idx + 1, 0, nb); else next.push(nb);
+                return next;
+              });
+              return;
+            }
+          }
+        }}
+      >
         <div style={{ fontSize: 38, marginBottom: 10, cursor: 'default', userSelect: 'none', lineHeight: 1 }}>{emoji}</div>
 
         <div
@@ -511,6 +560,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
               ref={el => { blockRefs.current[block.id] = el; }}
               onInput={e => handleInput(e, block.id)}
               onKeyDown={e => handleKeyDown(e, block, idx)}
+              onPasteImage={handlePasteImage}
               onFocus={() => setFocusedId(block.id)}
               onBlur={() => setFocusedId(id => id === block.id ? null : id)}
               isFocused={focusedId === block.id}
@@ -543,6 +593,8 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
         <SlashMenu pos={slash.pos} query={slash.query}
           onSelect={applySlashType} onClose={() => setSlash(null)}/>
       )}
+
+      <SelectionToolbar containerRef={bodyRef}/>
     </div>
   );
 }
