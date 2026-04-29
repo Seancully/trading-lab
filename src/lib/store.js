@@ -21,6 +21,39 @@ export function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
+// Per-trade P&L weighted by selected accounts.
+// `pnlDollars` on a trade is per-contract; each account on the trade carries
+// its own contract count. The effective P&L for a given filter is:
+//   Σ over accounts in filter   pnlDollars × contracts
+// Conventions for `accountFilter`:
+//   null/undefined → all accounts on the trade (no filter)
+//   []             → no accounts selected (always 0)
+//   [name, ...]    → only those names contribute
+export function effectivePnl(trade, accountFilter) {
+  const pnl = Number(trade?.pnlDollars) || 0;
+  const accounts = trade?.accounts || [];
+  // Old/sample data without per-account contract info: treat pnlDollars as the trade total.
+  if (!accounts.length) return accountFilter && accountFilter.length === 0 ? 0 : pnl;
+  let relevant = accounts;
+  if (Array.isArray(accountFilter)) {
+    if (!accountFilter.length) return 0;
+    relevant = accounts.filter(a => accountFilter.includes(a.name));
+  }
+  return relevant.reduce((sum, a) => sum + pnl * (Number(a.contracts) || 0), 0);
+}
+
+// Number of contracts for a trade under the current filter.
+export function effectiveContracts(trade, accountFilter) {
+  const accounts = trade?.accounts || [];
+  if (!accounts.length) return 1;
+  if (Array.isArray(accountFilter)) {
+    if (!accountFilter.length) return 0;
+    return accounts.filter(a => accountFilter.includes(a.name))
+      .reduce((s, a) => s + (Number(a.contracts) || 0), 0);
+  }
+  return accounts.reduce((s, a) => s + (Number(a.contracts) || 0), 0);
+}
+
 // ── Defaults ────────────────────────────────────────────────────────────────
 const DEFAULT_RULES_VERSION = 2;
 const DEFAULT_RULES = [

@@ -1,17 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Store } from '../lib/store.js';
+import { Store, effectivePnl } from '../lib/store.js';
 import { Tabs, StatCard, Empty, Icon, Badge, DirBadge, PnlText, Btn } from '../components/Shared.jsx';
 
 // ── Compute stats from trades ─────────────────────────────────────────────────
-export function calcStats(trades) {
+// `accountFilter` weights each trade by the contracts on the selected
+// accounts (null = all accounts on the trade contribute).
+export function calcStats(trades, accountFilter = null) {
   if (!trades.length) return null;
+  const eff = (t) => effectivePnl(t, accountFilter);
+
   const wins = trades.filter(t => t.result === 'Win');
   const losses = trades.filter(t => t.result === 'Loss');
   const bes = trades.filter(t => t.result === 'BE');
 
-  const totalPnl = trades.reduce((s, t) => s + (Number(t.pnlDollars) || 0), 0);
-  const grossWin = wins.reduce((s, t) => s + (Number(t.pnlDollars) || 0), 0);
-  const grossLoss = Math.abs(losses.reduce((s, t) => s + (Number(t.pnlDollars) || 0), 0));
+  const totalPnl = trades.reduce((s, t) => s + eff(t), 0);
+  const grossWin = wins.reduce((s, t) => s + eff(t), 0);
+  const grossLoss = Math.abs(losses.reduce((s, t) => s + eff(t), 0));
   const profitFactor = grossLoss === 0 ? grossWin > 0 ? '∞' : '—' : (grossWin / grossLoss).toFixed(2);
   const winRate = trades.length ? ((wins.length / trades.length) * 100).toFixed(1) : 0;
   const avgRWin = wins.length ? (wins.reduce((s, t) => s + (Number(t.rMultiple) || 0), 0) / wins.length).toFixed(2) : 0;
@@ -24,14 +28,17 @@ export function calcStats(trades) {
   let peak = 0, running = 0, maxDD = 0;
   const sorted = [...trades].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   for (const t of sorted) {
-    running += Number(t.pnlDollars) || 0;
+    running += eff(t);
     if (running > peak) peak = running;
     const dd = peak - running;
     if (dd > maxDD) maxDD = dd;
   }
 
   const byDay = {};
-  for (const t of trades) byDay[t.date] = (byDay[t.date] || 0) + (Number(t.pnlDollars) || 0);
+  for (const t of trades) {
+    if (!t.date) continue;
+    byDay[t.date] = (byDay[t.date] || 0) + eff(t);
+  }
   const dayVals = Object.values(byDay);
   const bestDay = dayVals.length ? Math.max(...dayVals) : 0;
   const worstDay = dayVals.length ? Math.min(...dayVals) : 0;
@@ -47,7 +54,7 @@ export function calcStats(trades) {
   }
 
   let cum = 0;
-  const equity = sorted.map(t => { cum += Number(t.pnlDollars) || 0; return { date: t.date, value: cum }; });
+  const equity = sorted.map(t => { cum += eff(t); return { date: t.date, value: cum }; });
 
   return {
     total: trades.length, wins: wins.length, losses: losses.length, bes: bes.length,
@@ -245,7 +252,7 @@ export function EquityCurve({ equity }) {
 }
 
 // ── Calendar ─────────────────────────────────────────────────────────────────
-export function CalendarView({ byDay, trades = [] }) {
+export function CalendarView({ byDay, trades = [], accountFilter = null }) {
   const [current, setCurrent] = useState(() => {
     const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() };
   });
@@ -404,7 +411,7 @@ export function CalendarView({ byDay, trades = [] }) {
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <PnlText value={trade.pnlDollars} size={13}/>
+                        <PnlText value={effectivePnl(trade, accountFilter)} size={13}/>
                         <Btn size="sm" variant="ghost" onClick={() => openTrade(trade.id)}>Open in Journal</Btn>
                       </div>
                     </div>
@@ -420,14 +427,14 @@ export function CalendarView({ byDay, trades = [] }) {
 }
 
 // ── Model breakdown ───────────────────────────────────────────────────────────
-function ModelBreakdown({ trades }) {
+function ModelBreakdown({ trades, accountFilter }) {
   const byModel = {};
   for (const t of trades) {
     const m = t.entryModel || 'Other';
     if (!byModel[m]) byModel[m] = { count: 0, wins: 0, pnl: 0 };
     byModel[m].count++;
     if (t.result === 'Win') byModel[m].wins++;
-    byModel[m].pnl += Number(t.pnlDollars) || 0;
+    byModel[m].pnl += effectivePnl(t, accountFilter);
   }
   const rows = Object.entries(byModel).sort((a, b) => b[1].count - a[1].count);
   if (!rows.length) return <div style={{ color: 'var(--text3)', fontSize: 12, padding: 12 }}>No trades</div>;
@@ -533,7 +540,7 @@ export default function Performance({ accountFilter }) {
     return trades.filter(t => (t.date || '') >= cutStr);
   }, [trades, period]);
 
-  const stats = useMemo(() => calcStats(filtered), [filtered]);
+  const stats = useMemo(() => calcStats(filtered, accountFilter), [filtered, accountFilter]);
 
   if (!stats) return <Empty icon="📈" title="No trade data yet" desc="Start journalling trades to see your performance metrics."/>;
 
@@ -580,7 +587,7 @@ export default function Performance({ accountFilter }) {
             />
             <div className="card">
               <div className="card-title">Entry Model Breakdown</div>
-              <ModelBreakdown trades={filtered}/>
+              <ModelBreakdown trades={filtered} accountFilter={accountFilter}/>
             </div>
           </div>
         </div>
@@ -588,14 +595,14 @@ export default function Performance({ accountFilter }) {
 
       {tab === 'Calendar' && (
         <div className="card">
-          <CalendarView byDay={stats.byDay} trades={filtered}/>
+          <CalendarView byDay={stats.byDay} trades={filtered} accountFilter={accountFilter}/>
         </div>
       )}
 
       {tab === 'Models' && (
         <div className="card">
           <div className="card-title">Entry Model Performance</div>
-          <ModelBreakdown trades={filtered}/>
+          <ModelBreakdown trades={filtered} accountFilter={accountFilter}/>
         </div>
       )}
 
