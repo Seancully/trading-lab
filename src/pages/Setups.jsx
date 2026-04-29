@@ -175,6 +175,7 @@ const Block = React.forwardRef(function Block({
         const file = item.getAsFile();
         if (file) {
           e.preventDefault();
+          e.stopPropagation();
           onPasteImage(file, block.id);
           return;
         }
@@ -556,6 +557,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
         ref={bodyRef}
         style={{ flex: 1, overflowY: 'auto', padding: '36px 52px 80px' }}
         onPaste={async (e) => {
+          if (e.defaultPrevented) return;
           // 1) Image in clipboard → insert as a new img block after the focused one.
           const items = e.clipboardData?.items || [];
           for (const item of items) {
