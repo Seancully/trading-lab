@@ -15,7 +15,8 @@ import Journal from './pages/Journal.jsx';
 import Rules from './pages/Rules.jsx';
 import Confluences from './pages/Confluences.jsx';
 import Setups from './pages/Setups.jsx';
-import Performance, { calcStats, EquityCurve, CalendarView } from './pages/Performance.jsx';
+import Performance, { EquityCurve, CalendarView } from './pages/Performance.jsx';
+import { calcStats } from './lib/stats.js';
 
 const NAV = [
   { id: 'dashboard',   label: 'Dashboard',    icon: 'dashboard' },

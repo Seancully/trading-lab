@@ -1,73 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Store, effectivePnl } from '../lib/store.js';
+import { calcStats } from '../lib/stats.js';
 import { Tabs, StatCard, Empty, Icon, Badge, DirBadge, PnlText, Btn } from '../components/Shared.jsx';
-
-// ── Compute stats from trades ─────────────────────────────────────────────────
-// `accountFilter` weights each trade by the contracts on the selected
-// accounts (null = all accounts on the trade contribute).
-export function calcStats(trades, accountFilter = null) {
-  if (!trades.length) return null;
-  const eff = (t) => effectivePnl(t, accountFilter);
-
-  const wins = trades.filter(t => t.result === 'Win');
-  const losses = trades.filter(t => t.result === 'Loss');
-  const bes = trades.filter(t => t.result === 'BE');
-
-  const totalPnl = trades.reduce((s, t) => s + eff(t), 0);
-  const grossWin = wins.reduce((s, t) => s + eff(t), 0);
-  const grossLoss = Math.abs(losses.reduce((s, t) => s + eff(t), 0));
-  const profitFactor = grossLoss === 0 ? grossWin > 0 ? '∞' : '—' : (grossWin / grossLoss).toFixed(2);
-  const winRate = trades.length ? ((wins.length / trades.length) * 100).toFixed(1) : 0;
-  const avgRWin = wins.length ? (wins.reduce((s, t) => s + (Number(t.rMultiple) || 0), 0) / wins.length).toFixed(2) : 0;
-  const avgRLoss = losses.length ? (losses.reduce((s, t) => s + (Number(t.rMultiple) || 0), 0) / losses.length).toFixed(2) : 0;
-  const scored = trades.filter(t => t.rulesScore > 0);
-  const avgRulesScore = scored.length
-    ? Math.round(scored.reduce((s, t) => s + t.rulesScore, 0) / scored.length)
-    : null;
-
-  let peak = 0, running = 0, maxDD = 0;
-  const sorted = [...trades].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-  for (const t of sorted) {
-    running += eff(t);
-    if (running > peak) peak = running;
-    const dd = peak - running;
-    if (dd > maxDD) maxDD = dd;
-  }
-
-  const byDay = {};
-  for (const t of trades) {
-    if (!t.date) continue;
-    byDay[t.date] = (byDay[t.date] || 0) + eff(t);
-  }
-  const dayVals = Object.values(byDay);
-  const bestDay = dayVals.length ? Math.max(...dayVals) : 0;
-  const worstDay = dayVals.length ? Math.min(...dayVals) : 0;
-
-  let streak = 0, streakType = 'Win';
-  const byDate = [...trades].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  if (byDate.length) {
-    streakType = byDate[0].result;
-    for (const t of byDate) {
-      if (t.result === streakType) streak++;
-      else break;
-    }
-  }
-
-  let cum = 0;
-  const equity = sorted.map(t => { cum += eff(t); return { date: t.date, value: cum }; });
-
-  return {
-    total: trades.length, wins: wins.length, losses: losses.length, bes: bes.length,
-    totalPnl, grossWin, grossLoss, profitFactor, winRate, avgRWin, avgRLoss,
-    avgRulesScore, maxDD, bestDay, worstDay, streak, streakType, equity, byDay,
-  };
-}
 
 // ── Equity curve canvas ───────────────────────────────────────────────────────
 export function EquityCurve({ equity }) {
   const canvasRef = useRef();
   const pointsRef = useRef([]);
   const [hoverIdx, setHoverIdx] = useState(null);
+  const [hoverPoint, setHoverPoint] = useState(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -199,6 +140,12 @@ export function EquityCurve({ equity }) {
     return () => { cancelled = true; ro.disconnect(); };
   }, [equity, hoverIdx]);
 
+  useEffect(() => {
+    if (hoverIdx === null) { setHoverPoint(null); return; }
+    const point = pointsRef.current[hoverIdx];
+    setHoverPoint(point || null);
+  }, [hoverIdx, equity]);
+
   const handleMove = (e) => {
     const canvas = canvasRef.current;
     const points = pointsRef.current;
@@ -222,7 +169,6 @@ export function EquityCurve({ equity }) {
     }
   };
 
-  const hoverPoint = hoverIdx !== null ? pointsRef.current[hoverIdx] : null;
   const delta = hoverPoint?.delta ?? 0;
   const kind = delta > 0 ? 'win' : delta < 0 ? 'loss' : 'be';
   const label = delta > 0 ? 'P' : delta < 0 ? 'L' : 'BE';

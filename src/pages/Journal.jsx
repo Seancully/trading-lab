@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Store, effectivePnl, effectiveContracts } from '../lib/store.js';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Store, effectivePnl } from '../lib/store.js';
 import { toast } from '../lib/toast.js';
 import {
   Icon, Badge, DirBadge, PnlText, RText, Modal, Btn, Tabs, Sep, Empty, Chip,
@@ -455,14 +455,14 @@ export default function Journal({ rules, settings, openTradeId, onOpenHandled, a
     return () => window.removeEventListener('tl:newTrade', fn);
   }, []);
 
+  const autoTrade = useMemo(() => {
+    if (!openTradeId) return null;
+    return trades.find(t => t.id === openTradeId) || null;
+  }, [openTradeId, trades]);
+
   useEffect(() => {
-    if (!openTradeId) return;
-    const trade = trades.find(t => t.id === openTradeId);
-    if (trade) {
-      setSelected(trade);
-      if (onOpenHandled) onOpenHandled();
-    }
-  }, [openTradeId, trades, onOpenHandled]);
+    if (openTradeId && autoTrade && onOpenHandled) onOpenHandled();
+  }, [openTradeId, autoTrade, onOpenHandled]);
 
   const handleSave = (trade) => {
     setTrades(Store.saveTrade(trade));
@@ -589,10 +589,10 @@ export default function Journal({ rules, settings, openTradeId, onOpenHandled, a
         </div>
       )}
 
-      {selected && (
-        <TradeModal trade={selected} rules={rules} settings={settings}
+      { (autoTrade || selected) && (
+        <TradeModal trade={autoTrade || selected} rules={rules} settings={settings}
           onSave={handleSave} onDelete={handleDelete}
-          onClose={() => setSelected(null)} isNew={false}/>
+          onClose={() => { if (onOpenHandled) onOpenHandled(); setSelected(null); }} isNew={false}/>
       )}
       {adding && (
         <TradeModal trade={null} rules={rules} settings={settings}
