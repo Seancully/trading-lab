@@ -72,6 +72,7 @@ const Block = React.forwardRef(function Block({
   onKeyDown,
   onImageUpload,
   onPasteImage,
+  onRemoveBlock,
   isFocused,
   isDragOver,
   onFocus,
@@ -125,8 +126,16 @@ const Block = React.forwardRef(function Block({
         >⋮⋮</div>
         <div style={{ padding: '4px 0', flex: 1 }}>
         {block.imageUrl ? (
-          <div>
+          <div className="block-image">
             <img src={block.imageUrl} alt="" style={{ maxWidth: '100%', borderRadius: 8, border: '1px solid var(--border)', display: 'block' }}/>
+            <button
+              type="button"
+              className="block-image-remove"
+              title="Remove image"
+              onClick={() => onRemoveBlock?.(block.id)}
+            >
+              <Icon name="trash" size={12}/>
+            </button>
             <div ref={localRef} contentEditable suppressContentEditableWarning
               data-placeholder={isFocused ? 'Caption...' : ''} onInput={onInput}
               style={{ fontSize: 12, color: 'var(--text3)', marginTop: 6, outline: 'none', fontStyle: 'italic', minHeight: '1.4em' }}
@@ -317,6 +326,20 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
     const prevId = blocks[idx - 1]?.id;
     setBlocks(bs => bs.filter((_, i) => i !== idx));
     if (prevId) focusBlock(prevId);
+  };
+
+  const removeBlockById = (id) => {
+    setBlocks(bs => {
+      const idx = bs.findIndex(b => b.id === id);
+      if (idx === -1) return bs;
+      if (bs.length <= 1) {
+        return bs.map(b => b.id === id ? { ...b, type: 'p', text: '' } : b);
+      }
+      const next = bs.filter((_, i) => i !== idx);
+      const focusId = next[Math.max(0, idx - 1)]?.id;
+      if (focusId) setTimeout(() => focusBlock(focusId), 20);
+      return next;
+    });
   };
 
   const updateBlockText = (id, text) => {
@@ -632,6 +655,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
               onInput={e => handleInput(e, block.id)}
               onKeyDown={e => handleKeyDown(e, block, idx)}
               onPasteImage={handlePasteImage}
+              onRemoveBlock={removeBlockById}
               onFocus={() => setFocusedId(block.id)}
               onBlur={() => setFocusedId(id => id === block.id ? null : id)}
               isFocused={focusedId === block.id}
