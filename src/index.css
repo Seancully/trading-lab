@@ -78,6 +78,7 @@ button, input, select, textarea { font-family: inherit; }
   background: var(--bg2); border-bottom: 1px solid var(--border);
   display: flex; align-items: center; padding: 0 24px; gap: 0; z-index: 20;
 }
+.topnav-row { display: contents; }
 .topnav-logo {
   display: flex; flex-direction: column; gap: 1px;
   padding-right: 24px; border-right: 1px solid var(--border);
@@ -93,7 +94,7 @@ button, input, select, textarea { font-family: inherit; }
 }
 .topnav-logo p { font-size: 9px; color: var(--text3); letter-spacing: 0.06em; }
 
-.topnav-items { display: flex; align-items: stretch; height: 100%; overflow-x: auto; scrollbar-width: none; }
+.topnav-items { display: flex; align-items: stretch; height: 100%; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; }
 .topnav-items::-webkit-scrollbar { display: none; }
 
 .nav-item {
@@ -142,13 +143,61 @@ button, input, select, textarea { font-family: inherit; }
 .page-header p  { font-size: 12px; color: var(--text3); margin-top: 5px; }
 .main-content { padding: 0 32px 40px; }
 
+/* Modal + drawer mobile polish — recover the screen edge for small phones. */
+@media (max-width: 540px) {
+  .modal-overlay { padding: 8px; }
+  .modal { max-height: calc(100vh - 16px); border-radius: 10px; }
+  .modal-header { padding: 14px 16px 12px; }
+  .modal-body { padding: 16px; }
+  .modal-body .tabs { width: 100%; overflow-x: auto; flex-wrap: nowrap; }
+  .modal-body .tabs::-webkit-scrollbar { display: none; }
+  .modal-body .tab { flex-shrink: 0; }
+  /* Modal footer: stack into two rows so a 3-button bar fits on phones. */
+  .modal > div:last-child { flex-wrap: wrap !important; padding: 12px 16px !important; gap: 6px !important; }
+  .modal > div:last-child .btn { flex: 1 1 auto; justify-content: center; }
+  /* Form grids fall back to single column on phone — easier to fill. */
+  .modal [style*="grid-template-columns"][style*="minmax(140px"],
+  .modal [style*="grid-template-columns"][style*="minmax(160px"],
+  .modal [style*="grid-template-columns"][style*="minmax(220px"],
+  .modal [style*="grid-template-columns"][style*="minmax(240px"] { grid-template-columns: 1fr !important; }
+}
+
 @media (max-width: 720px) {
-  .topnav { padding: 0 12px; }
-  .topnav-logo { padding-right: 12px; margin-right: 4px; }
-  .nav-item { padding: 0 10px; font-size: 12px; }
+  /* Stack the topnav into two rows so the nav items always have full width
+     to scroll across, instead of being squeezed to zero by the actions. */
+  .topnav {
+    height: auto; padding: 0;
+    flex-direction: column; align-items: stretch;
+  }
+  .topnav-row {
+    display: flex; align-items: center;
+    width: 100%; padding: 8px 12px; gap: 8px;
+  }
+  .topnav-row.row-top { border-bottom: 1px solid var(--border); }
+  .topnav-logo {
+    padding-right: 0; margin-right: 0;
+    border-right: none; flex-shrink: 0;
+  }
+  .topnav-actions { gap: 4px; }
+  .topnav-items {
+    height: 44px;
+    padding: 0 6px;
+    width: 100%;
+  }
+  .nav-item { padding: 0 12px; font-size: 12px; }
   .nav-item span.label { display: none; }
-  .page-header { padding: 20px 16px 0; }
-  .main-content { padding: 0 16px 32px; }
+  /* Compact action buttons (inline styles need !important to override) */
+  .topnav-actions .palette-trigger { display: none !important; }   /* no ⌘K on touch */
+  .topnav-actions .sync-badge-text { display: none; }              /* dot only */
+  .topnav-actions .filter-pill-label { max-width: 90px; }
+  .topnav-actions .user-email { display: none; }                   /* keep avatar+logout */
+  .page-header { padding: 16px 14px 0; }
+  .main-content { padding: 0 14px 28px; }
+  .page-header h2 { font-size: 22px; }
+}
+@media (max-width: 420px) {
+  .topnav-actions .filter-pill-label { display: none; }
+  .topnav-actions .filter-pill-icon { display: flex; }
 }
 
 /* ── Cards ──────────────────────────────────────────────────────────────── */
@@ -514,8 +563,11 @@ body.light .form-select option { background: #ffffff; color: #0A0A0C; }
 
 @media (max-width: 720px) {
   .notes-layout { flex-direction: column; height: auto; }
-  .notes-sidebar { width: 100%; max-height: 240px; }
+  .notes-sidebar { width: 100%; max-height: 220px; }
   .notes-editor-wrap { min-height: 480px; }
+  /* Notes editor body has 36px 52px 80px padding on desktop — too much for phone. */
+  .notes-editor-wrap > div:nth-child(2) { padding: 20px 16px 60px !important; }
+  .slash-menu { max-width: calc(100vw - 16px); }
 }
 
 [contenteditable] { outline: none; }
@@ -734,13 +786,14 @@ body.light .form-select option { background: #ffffff; color: #0A0A0C; }
 .account-filter-pill.active { color: var(--accent); border-color: var(--accentBorder); background: var(--accentDim); }
 .account-filter-menu {
   position: absolute; top: calc(100% + 6px); right: 0;
-  min-width: 220px; max-width: 320px;
+  min-width: 220px; max-width: min(320px, calc(100vw - 24px));
   background: var(--surface2); border: 1px solid var(--border2);
   border-radius: 10px; padding: 6px;
   box-shadow: 0 16px 48px rgba(0,0,0,0.5);
   z-index: 100;
   animation: pageIn 0.15s ease;
 }
+.filter-pill-icon { display: inline-flex; align-items: center; }
 .account-filter-menu .menu-row {
   display: flex; align-items: center; gap: 8px;
   padding: 8px 10px; border-radius: 6px; cursor: pointer;

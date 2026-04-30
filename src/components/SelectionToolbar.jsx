@@ -19,7 +19,17 @@ export default function SelectionToolbar({ containerRef }) {
       if (!container.contains(range.commonAncestorContainer)) { setPos(null); return; }
       const rect = range.getBoundingClientRect();
       if (!rect || (!rect.width && !rect.height)) { setPos(null); return; }
-      setPos({ top: rect.top - 44, left: rect.left + rect.width / 2 });
+      // Clamp horizontally so the toolbar stays fully on-screen.
+      // Estimate width — final width measured after render in the second pass.
+      const tbW = tbRef.current?.offsetWidth || 280;
+      const margin = 8;
+      const half = tbW / 2;
+      const center = Math.max(margin + half, Math.min(window.innerWidth - margin - half, rect.left + rect.width / 2));
+      // Place above by default, but flip below if it would clip off the top.
+      const aboveTop = rect.top - 44;
+      const belowTop = rect.bottom + 8;
+      const top = aboveTop < margin ? belowTop : aboveTop;
+      setPos({ top, left: center });
       setActive({
         bold: document.queryCommandState('bold'),
         italic: document.queryCommandState('italic'),

@@ -146,28 +146,54 @@ export function EquityCurve({ equity }) {
     setHoverPoint(point || null);
   }, [hoverIdx, equity]);
 
-  const handleMove = (e) => {
-    const canvas = canvasRef.current;
+  // Reusable hit-test against nearest data point, given canvas-space coords.
+  const hitTest = (cx, cy, hitRadius = 8) => {
     const points = pointsRef.current;
-    if (!canvas || !points.length) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    if (!points.length) return -1;
     let nearest = -1;
     let best = Infinity;
     for (let i = 0; i < points.length; i++) {
-      const dx = points[i].x - x;
-      const dy = points[i].y - y;
+      const dx = points[i].x - cx;
+      const dy = points[i].y - cy;
       const dist = dx * dx + dy * dy;
       if (dist < best) { best = dist; nearest = i; }
     }
-    const hit = 8 * 8;
-    if (nearest >= 0 && best <= hit) {
-      if (hoverIdx !== nearest) setHoverIdx(nearest);
+    return best <= hitRadius * hitRadius ? nearest : -1;
+  };
+
+  const handleMove = (e) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const idx = hitTest(e.clientX - rect.left, e.clientY - rect.top, 8);
+    if (idx >= 0) {
+      if (hoverIdx !== idx) setHoverIdx(idx);
     } else if (hoverIdx !== null) {
       setHoverIdx(null);
     }
   };
+
+  // Touch: a tap pins the nearest point's tooltip. Tapping elsewhere on the
+  // canvas (or anywhere outside) dismisses it.
+  const handleTouch = (e) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const t = e.touches?.[0] || e.changedTouches?.[0];
+    if (!t) return;
+    const rect = canvas.getBoundingClientRect();
+    const idx = hitTest(t.clientX - rect.left, t.clientY - rect.top, 22); // bigger touch hit
+    setHoverIdx(idx >= 0 ? idx : null);
+  };
+  useEffect(() => {
+    if (hoverIdx === null) return;
+    const off = (e) => {
+      const canvas = canvasRef.current;
+      if (canvas && canvas.contains(e.target)) return;
+      setHoverIdx(null);
+    };
+    document.addEventListener('touchstart', off, { passive: true });
+    return () => document.removeEventListener('touchstart', off);
+  }, [hoverIdx]);
 
   const delta = hoverPoint?.delta ?? 0;
   const kind = delta > 0 ? 'win' : delta < 0 ? 'loss' : 'be';
@@ -182,7 +208,9 @@ export function EquityCurve({ equity }) {
         ref={canvasRef}
         onMouseMove={handleMove}
         onMouseLeave={() => setHoverIdx(null)}
-        style={{ width: '100%', height: '100%', display: 'block' }}
+        onTouchStart={handleTouch}
+        onTouchMove={handleTouch}
+        style={{ width: '100%', height: '100%', display: 'block', touchAction: 'pan-y' }}
       />
       {hoverPoint && (
         <div className={`equity-tooltip ${kind}`} style={{ left: hoverPoint.x, top: hoverPoint.y }}>

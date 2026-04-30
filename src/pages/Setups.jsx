@@ -245,7 +245,8 @@ function SlashMenu({ pos, query, onSelect, onClose }) {
 
   if (!filtered.length) return null;
 
-  const left = Math.min(pos.x, window.innerWidth - 260);
+  const margin = 8;
+  const left = Math.max(margin, Math.min(pos.x, window.innerWidth - 260 - margin));
   const top = Math.max(8, Math.min(pos.y + 4, window.innerHeight - 320));
 
   return (
