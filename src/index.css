@@ -62,6 +62,12 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
+/* Lock horizontal scroll. The app is column-oriented; any side-scroll is
+   a leak from a too-wide child (chart canvas, long instrument label,
+   etc) and should never reach the viewport on phones. */
+html, body { overflow-x: hidden; max-width: 100vw; overscroll-behavior-x: none; }
+#root { overflow-x: hidden; }
+img, canvas, svg, video { max-width: 100%; }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
@@ -133,7 +139,7 @@ button, input, select, textarea { font-family: inherit; }
 .icon-btn:hover { background: var(--surface2); color: var(--text); }
 
 /* ── Main ───────────────────────────────────────────────────────────────── */
-.main { flex: 1; overflow-y: auto; }
+.main { flex: 1; overflow-y: auto; overflow-x: hidden; }
 .page-header {
   padding: 28px 32px 0;
   display: flex; align-items: flex-end; justify-content: space-between;
@@ -567,11 +573,41 @@ body.light .form-select option { background: #ffffff; color: #0A0A0C; }
 
 /* ── Dashboard welcome ──────────────────────────────────────────────────── */
 .welcome-bar {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius-lg); padding: 20px 24px; margin-bottom: 18px;
+  position: relative;
+  background:
+    radial-gradient(120% 140% at 0% 0%, var(--accentDim) 0%, transparent 55%),
+    linear-gradient(135deg, var(--surface) 0%, var(--surface) 60%, var(--bg2) 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 22px 26px; margin-bottom: 18px;
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
   flex-wrap: wrap;
+  overflow: hidden;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.03) inset,
+    0 8px 24px -14px rgba(0, 0, 0, 0.5);
 }
+.welcome-bar::before {
+  content: '';
+  position: absolute;
+  top: -40%; right: -10%;
+  width: 320px; height: 320px;
+  background: radial-gradient(circle, var(--accentDim) 0%, transparent 70%);
+  opacity: 0.5;
+  pointer-events: none;
+}
+.welcome-bar > * { position: relative; z-index: 1; }
+.welcome-spark {
+  position: absolute; right: 0; bottom: 0; left: 0;
+  height: 36px; pointer-events: none; opacity: 0.35;
+  z-index: 0;
+}
+[data-theme="light"] .welcome-bar {
+  background:
+    radial-gradient(120% 140% at 0% 0%, var(--accentDim) 0%, transparent 55%),
+    linear-gradient(135deg, var(--surface) 0%, var(--bg2) 100%);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 16px -8px rgba(15, 23, 42, 0.14);
+}
+[data-theme="light"] .welcome-spark { opacity: 0.5; }
 
 /* ── Animations ─────────────────────────────────────────────────────────── */
 @keyframes fadeUp {
