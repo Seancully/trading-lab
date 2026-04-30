@@ -120,31 +120,23 @@ function AccountFilterPill({ accounts, value, onChange }) {
   );
 }
 
-function PnlChip({ value, label, delta, scale = 1 }) {
+function PnlChip({ value, label, scale = 1 }) {
   const pos = value > 0, neg = value < 0;
-  // `scale` is a 0..1 emphasis multiplier — Today gets full intensity, week
-  // medium, month muted. Keeps the three chips visually distinct rather than
-  // three identical green boxes.
-  const tint = pos ? 'bull' : neg ? 'bear' : 'be';
-  const bgAlpha = 0.10 + 0.10 * scale;
-  const borderAlpha = 0.18 + 0.14 * scale;
-  const tintRgb = tint === 'bull' ? '34,197,94' : tint === 'bear' ? '244,63,94' : '148,163,184';
-  const showDelta = delta !== undefined && delta !== null && Number.isFinite(delta);
+  const tintRgb = pos ? '34,197,94' : neg ? '244,63,94' : '148,163,184';
+  // Emphasise "Today" heavily, fade week and month progressively so the three
+  // chips are clearly tiered at a glance. bg/border/fontSize all scale together.
+  const bgAlpha     = 0.05 + 0.18 * scale;   // Today 0.23 · Week 0.158 · Month 0.095
+  const borderAlpha = 0.12 + 0.30 * scale;   // Today 0.42 · Week 0.30  · Month 0.195
+  const borderWidth = scale >= 0.9 ? 2 : 1;
+  const numSize     = 14 + 8 * scale;         // Today 22 · Week 18.8 · Month 16
   return (
     <div style={{
       background: `rgba(${tintRgb}, ${bgAlpha})`,
-      border: `1px solid rgba(${tintRgb}, ${borderAlpha})`,
+      border: `${borderWidth}px solid rgba(${tintRgb}, ${borderAlpha})`,
       borderRadius: 8, padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: 3,
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text3)' }}>{label}</div>
-        {showDelta && (
-          <div style={{ fontSize: 10, fontFamily: 'var(--mono)', color: delta > 0 ? 'var(--bull)' : delta < 0 ? 'var(--bear)' : 'var(--text3)' }}>
-            {delta > 0 ? '▲' : delta < 0 ? '▼' : '·'} {delta >= 0 ? '+' : '-'}${Math.abs(Math.round(delta)).toLocaleString()}
-          </div>
-        )}
-      </div>
-      <div style={{ fontFamily: 'var(--mono)', fontSize: 20, fontWeight: 700,
+      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text3)' }}>{label}</div>
+      <div style={{ fontFamily: 'var(--mono)', fontSize: numSize, fontWeight: 700,
         color: pos ? 'var(--bull)' : neg ? 'var(--bear)' : 'var(--be)' }}>
         {value >= 0 ? '+' : ''}${Math.abs(value).toLocaleString()}
       </div>
@@ -161,28 +153,18 @@ function Dashboard({ onNav, accountFilter }) {
   const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const now = new Date();
   const today = ymd(now);
-  const yesterday = (() => { const d = new Date(now); d.setDate(d.getDate() - 1); return ymd(d); })();
   const weekStart = (() => { const d = new Date(now); const dow = d.getDay(); d.setDate(d.getDate() - ((dow + 6) % 7)); d.setHours(0,0,0,0); return d; })();
-  const prevWeekStart = (() => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); return d; })();
   const monthStart = ymd(new Date(now.getFullYear(), now.getMonth(), 1));
-  const prevMonthStart = ymd(new Date(now.getFullYear(), now.getMonth() - 1, 1));
-  const prevMonthEnd = ymd(new Date(now.getFullYear(), now.getMonth(), 0));
 
-  const todayTrades  = trades.filter(t => t.date === today);
-  const yestTrades   = trades.filter(t => t.date === yesterday);
-  const weekTrades   = trades.filter(t => (t.date || '') >= ymd(weekStart));
-  const prevWeekTrades = trades.filter(t => (t.date || '') >= ymd(prevWeekStart) && (t.date || '') < ymd(weekStart));
-  const monthTrades  = trades.filter(t => (t.date || '') >= monthStart);
-  const prevMonthTrades = trades.filter(t => (t.date || '') >= prevMonthStart && (t.date || '') <= prevMonthEnd);
+  const todayTrades = trades.filter(t => t.date === today);
+  const weekTrades  = trades.filter(t => (t.date || '') >= ymd(weekStart));
+  const monthTrades = trades.filter(t => (t.date || '') >= monthStart);
 
   const eff = (t) => effectivePnl(t, accountFilter);
   const sumPnl = (arr) => arr.reduce((s, t) => s + eff(t), 0);
-  const todayPnl  = sumPnl(todayTrades);
-  const weekPnl   = sumPnl(weekTrades);
-  const monthPnl  = sumPnl(monthTrades);
-  const yestPnl   = sumPnl(yestTrades);
-  const prevWeekPnl = sumPnl(prevWeekTrades);
-  const prevMonthPnl = sumPnl(prevMonthTrades);
+  const todayPnl = sumPnl(todayTrades);
+  const weekPnl  = sumPnl(weekTrades);
+  const monthPnl = sumPnl(monthTrades);
 
   const greet = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening';
   const dateLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
@@ -203,9 +185,9 @@ function Dashboard({ onNav, accountFilter }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginBottom: 20 }}>
-        <PnlChip value={todayPnl} scale={1.0} delta={yestTrades.length      ? todayPnl - yestPnl       : null} label={`Today · ${todayTrades.length} trade${todayTrades.length !== 1 ? 's' : ''}`}/>
-        <PnlChip value={weekPnl}  scale={0.6} delta={prevWeekTrades.length  ? weekPnl  - prevWeekPnl   : null} label={`This week · ${weekTrades.length} trade${weekTrades.length !== 1 ? 's' : ''}`}/>
-        <PnlChip value={monthPnl} scale={0.25} delta={prevMonthTrades.length ? monthPnl - prevMonthPnl : null} label={`This month · ${monthTrades.length} trade${monthTrades.length !== 1 ? 's' : ''}`}/>
+        <PnlChip value={todayPnl} scale={1.0}  label={`Today · ${todayTrades.length} trade${todayTrades.length !== 1 ? 's' : ''}`}/>
+        <PnlChip value={weekPnl}  scale={0.6}  label={`This week · ${weekTrades.length} trade${weekTrades.length !== 1 ? 's' : ''}`}/>
+        <PnlChip value={monthPnl} scale={0.25} label={`This month · ${monthTrades.length} trade${monthTrades.length !== 1 ? 's' : ''}`}/>
       </div>
 
       {stats && (

@@ -460,6 +460,7 @@ export const Store = {
     const ids = this.getDeletedTradeIds?.() ?? new Set();
     let mutated = false;
     const out = [];
+    const seenFps = new Set(); // guard against live duplicates (cross-device sync can create same trade with two IDs)
     for (const t of raw) {
       if (!t || typeof t !== 'object') { mutated = true; continue; }
       const pnl = Number(t.pnlDollars) || 0;
@@ -468,6 +469,9 @@ export const Store = {
       const hasContent = pnl !== 0 || r !== 0 || (hasResult && t.date);
       if (!hasContent) { mutated = true; continue; } // husk
       if (ids.has(t.id) || fps.has(tradeFingerprint(t))) { mutated = true; continue; }
+      const fp = tradeFingerprint(t);
+      if (seenFps.has(fp)) { mutated = true; continue; } // live duplicate — keep first occurrence
+      seenFps.add(fp);
       if (!t.id) {
         mutated = true;
         out.push({ ...t, id: uid() });
