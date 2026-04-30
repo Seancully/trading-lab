@@ -488,8 +488,10 @@ export default function Journal({ rules, settings, openTradeId, onOpenHandled, a
       t.accounts?.some(a => a.name.toLowerCase().includes(q))
     );
   }
-  if (sort === 'newest') visible.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  else if (sort === 'oldest') visible.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  // Use date + time so same-day trades sort by intraday time too.
+  const ts = (t) => `${t.date || ''}T${t.time || '00:00'}`;
+  if (sort === 'newest') visible.sort((a, b) => ts(b).localeCompare(ts(a)));
+  else if (sort === 'oldest') visible.sort((a, b) => ts(a).localeCompare(ts(b)));
   else if (sort === 'pnl-hi') visible.sort((a, b) => effectivePnl(b, accountFilter) - effectivePnl(a, accountFilter));
   else if (sort === 'pnl-lo') visible.sort((a, b) => effectivePnl(a, accountFilter) - effectivePnl(b, accountFilter));
   else if (sort === 'manual') {
