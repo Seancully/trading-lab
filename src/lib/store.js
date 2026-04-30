@@ -16,6 +16,7 @@ const KEYS = {
   setups: 'tl_setups',
   settings: 'tl_settings',
   notes: 'tl_notes',
+  deletedNotes: 'tl_deleted_notes',
   accountFilter: 'tl_account_filter',
 };
 
@@ -100,54 +101,11 @@ const DEFAULT_RULES = [
   ]},
 ];
 
-const DEFAULT_NOTES = [
-  {
-    id: 'note-1', emoji: '📐', title: 'HTF PDA → IFVG',
-    tags: ['A+', 'Primary', 'IFVG'],
-    blocks: [
-      { id: 'b1', type: 'h1', text: 'HTF PDA → IFVG' },
-      { id: 'b2', type: 'p',  text: 'Core entry model. HTF bias confirmed via PDA array, IFVG forms on LTF, enter targeting strong external DOL.' },
-      { id: 'b3', type: 'h2', text: 'Entry Steps' },
-      { id: 'b4', type: 'li', text: 'Identify HTF bias — is price in premium or discount?' },
-      { id: 'b5', type: 'li', text: 'Mark the HTF PDA array at current dealing range' },
-      { id: 'b6', type: 'li', text: 'Wait for price to arrive and react at the array' },
-      { id: 'b7', type: 'li', text: 'Drop to LTF (1m–5m) — look for IFVG + displacement' },
-      { id: 'b8', type: 'li', text: 'Enter at IFVG midpoint/CE, stop beyond the array' },
-      { id: 'b9', type: 'h2', text: 'Notes' },
-      { id: 'b10', type: 'bq', text: 'Best during London open (3–5am NY) and NY kill zone (8:30–11am). Avoid within 5 mins of news.' },
-    ],
-    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'note-2', emoji: '🔄', title: 'Internal → External (4 Ways)',
-    tags: ['A+', 'Liquidity'],
-    blocks: [
-      { id: 'c1', type: 'h1', text: 'Internal → External (4 Ways)' },
-      { id: 'c2', type: 'p',  text: 'Price sweeps internal range liquidity then delivers to external. Four variations.' },
-      { id: 'c3', type: 'h2', text: 'Variations' },
-      { id: 'c4', type: 'li', text: 'Var 1 — Sweep internal BSL → Short to external SSL' },
-      { id: 'c5', type: 'li', text: 'Var 2 — Sweep internal SSL → Long to external BSL' },
-      { id: 'c6', type: 'li', text: 'Var 3 — Break internal BSL → Long continuation' },
-      { id: 'c7', type: 'li', text: 'Var 4 — Break internal SSL → Short continuation' },
-      { id: 'c8', type: 'bq', text: 'Sweep variations (1 & 2) are highest probability. Break vars need stronger displacement evidence.' },
-    ],
-    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'note-3', emoji: '⚡', title: 'SMT + IFVG',
-    tags: ['A', 'SMT'],
-    blocks: [
-      { id: 'd1', type: 'h1', text: 'SMT + IFVG' },
-      { id: 'd2', type: 'p',  text: 'SMT divergence between MNQ and MES at a key level, followed by IFVG entry. SMT is confirmation — never standalone.' },
-      { id: 'd3', type: 'h2', text: 'Steps' },
-      { id: 'd4', type: 'li', text: 'Identify key HTF level (old HOD/LOD, PDA array)' },
-      { id: 'd5', type: 'li', text: 'Watch MNQ vs MES: one makes new extreme, other fails' },
-      { id: 'd6', type: 'li', text: 'Confirm IFVG on LTF — this is the actual entry trigger' },
-      { id: 'd7', type: 'bq', text: 'Never enter on SMT alone. The IFVG is the entry.' },
-    ],
-    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-  },
-];
+// IDs of notes that were previously seeded into the app. They were pushed to
+// Supabase on first sync, so simply removing the seed isn't enough — they'd
+// keep coming back from remote. We tombstone these ids permanently so any
+// stale remote rows are deleted on next sync.
+const HARDCODED_NOTE_IDS = ['note-1', 'note-2', 'note-3'];
 
 const DEFAULT_SETTINGS = {
   theme: 'dark',
@@ -368,12 +326,38 @@ export const Sync = {
           }
         }
       }
-      // Notes
+      // Notes — tombstone-aware merge. Hardcoded seed ids are permanently
+      // tombstoned so old rows stuck in Supabase get scrubbed on sync.
+      const remoteDeletedNotes = await this.pull('deleted_notes');
+      const localDeletedNotesRaw = readArr(KEYS.deletedNotes);
+      const noteTombstoneSet = new Set([
+        ...HARDCODED_NOTE_IDS,
+        ...(Array.isArray(remoteDeletedNotes) ? remoteDeletedNotes : []),
+        ...localDeletedNotesRaw,
+      ]);
+      const noteTombstoneArr = [...noteTombstoneSet];
+      localStorage.setItem(KEYS.deletedNotes, JSON.stringify(noteTombstoneArr));
+      if (noteTombstoneArr.length > (remoteDeletedNotes?.length || 0)) {
+        await this.push('deleted_notes', noteTombstoneArr);
+      }
+
       const remoteNotes = await this.pullPrefix('note_');
       if (remoteNotes) {
+        // Garbage-collect any remote note that's tombstoned or has no id.
+        for (const r of remoteNotes) {
+          if (!r.value || !r.value.id || noteTombstoneSet.has(r.value.id)) {
+            await this.deleteKey(r.key);
+          }
+        }
         const local = Store.getNotes();
-        const remoteMap = Object.fromEntries(remoteNotes.map(r => [r.value.id, r.value]));
-        const localMap  = Object.fromEntries(local.map(n => [n.id, n]));
+        const remoteMap = Object.fromEntries(
+          remoteNotes
+            .filter(r => r.value && r.value.id && !noteTombstoneSet.has(r.value.id))
+            .map(r => [r.value.id, r.value])
+        );
+        const localMap = Object.fromEntries(
+          local.filter(n => n.id && !noteTombstoneSet.has(n.id)).map(n => [n.id, n])
+        );
         const merged = Object.values({ ...remoteMap, ...localMap });
         localStorage.setItem(KEYS.notes, JSON.stringify(merged));
         for (const n of merged) {
@@ -745,20 +729,32 @@ export const Store = {
     Sync.push('account_filter', filter || []);
   },
 
-  getNotes() { return read(KEYS.notes, DEFAULT_NOTES); },
+  getNotes() {
+    const tombstones = new Set([
+      ...HARDCODED_NOTE_IDS,
+      ...read(KEYS.deletedNotes, []),
+    ]);
+    return read(KEYS.notes, []).filter(n => n && n.id && !tombstones.has(n.id));
+  },
   saveNote(note) {
-    const notes = this.getNotes();
+    const notes = read(KEYS.notes, []);
     const idx = notes.findIndex(n => n.id === note.id);
     if (idx >= 0) notes[idx] = note; else notes.unshift(note);
     localStorage.setItem(KEYS.notes, JSON.stringify(notes));
     Sync.push('note_' + note.id, note);
-    return notes;
+    return this.getNotes();
   },
   deleteNote(id) {
-    const notes = this.getNotes().filter(n => n.id !== id);
+    const notes = read(KEYS.notes, []).filter(n => n.id !== id);
     localStorage.setItem(KEYS.notes, JSON.stringify(notes));
+    // Tombstone so a stale Supabase row from another device can't resurrect it.
+    const tombs = new Set(read(KEYS.deletedNotes, []));
+    tombs.add(id);
+    const arr = [...tombs];
+    localStorage.setItem(KEYS.deletedNotes, JSON.stringify(arr));
     Sync.deleteKey('note_' + id);
-    return notes;
+    Sync.push('deleted_notes', arr);
+    return this.getNotes();
   },
 
   getSettings() {

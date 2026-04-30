@@ -257,7 +257,13 @@ export function CalendarView({ byDay, trades = [], accountFilter = null }) {
   while (cur <= lastDay || weeks.length < 5) {
     const week = [];
     for (let d = 0; d < 5; d++) {
-      const dateStr = cur.toISOString().slice(0, 10);
+      // Local YYYY-MM-DD — toISOString() is UTC and shifts the date for any
+      // timezone offset from UTC, which mismatched trade.date strings stored
+      // as local dates and made each day's P&L appear in the wrong column.
+      const y = cur.getFullYear();
+      const m = String(cur.getMonth() + 1).padStart(2, '0');
+      const d2 = String(cur.getDate()).padStart(2, '0');
+      const dateStr = `${y}-${m}-${d2}`;
       const inMonth = cur.getMonth() === month;
       const pnl = byDay[dateStr];
       week.push({ date: dateStr, day: cur.getDate(), inMonth, pnl });
@@ -274,7 +280,10 @@ export function CalendarView({ byDay, trades = [], accountFilter = null }) {
 
   const dayHeaders = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
   const fmtDay = (dateStr) => new Date(`${dateStr}T00:00:00`).toLocaleDateString(undefined, {
     weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
   });
