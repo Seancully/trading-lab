@@ -500,6 +500,77 @@ function EquityCard({ title, subtitle, equity = [], height, empty, totalPnl, max
   );
 }
 
+// ── Weekly lessons ────────────────────────────────────────────────────────────
+// Local Mon 00:00 → next Mon 00:00. Rolls over Monday morning automatically.
+function startOfThisWeek() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  const dow = d.getDay();             // 0=Sun..6=Sat
+  const offset = dow === 0 ? 6 : dow - 1;
+  d.setDate(d.getDate() - offset);
+  return d;
+}
+function localDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function fmtLessonDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(`${dateStr}T00:00:00`);
+  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function WeeklyLessons({ trades }) {
+  const lessons = useMemo(() => {
+    const start = localDateStr(startOfThisWeek());
+    return trades
+      .filter(t => (t.lesson || '').trim() && (t.date || '') >= start)
+      .sort((a, b) => {
+        const ad = (a.date || '') + ' ' + (a.time || '');
+        const bd = (b.date || '') + ' ' + (b.time || '');
+        return bd.localeCompare(ad);
+      });
+  }, [trades]);
+
+  return (
+    <div className="card" style={{ marginTop: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div className="card-title" style={{ margin: 0 }}>Lessons This Week</div>
+        <div style={{ fontSize: 11, color: 'var(--text3)' }}>
+          Mon–Sun · {lessons.length} lesson{lessons.length === 1 ? '' : 's'}
+        </div>
+      </div>
+      {lessons.length === 0 ? (
+        <div style={{ color: 'var(--text3)', fontSize: 12, padding: '20px 4px' }}>
+          No lessons yet this week. Add a key takeaway when you review a trade and it'll show up here.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {lessons.map(t => {
+            const resultColor = t.result === 'Win' ? 'var(--bull)' : t.result === 'Loss' ? 'var(--bear)' : 'var(--text3)';
+            return (
+              <div key={t.id} style={{
+                padding: '10px 12px',
+                borderLeft: `2px solid ${resultColor}`,
+                background: 'var(--bg2)',
+                borderRadius: 4,
+              }}>
+                <div style={{ fontSize: 13, color: 'var(--text)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                  {t.lesson.trim()}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <span>{fmtLessonDate(t.date)}</span>
+                  {t.entryModel && <span>· {t.entryModel}</span>}
+                  {t.result && <span style={{ color: resultColor }}>· {t.result}</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Performance main ──────────────────────────────────────────────────────────
 export default function Performance({ accountFilter }) {
   const [allTrades] = useState(() => Store.getTrades());
@@ -573,6 +644,8 @@ export default function Performance({ accountFilter }) {
               <ModelBreakdown trades={filtered} accountFilter={accountFilter}/>
             </div>
           </div>
+
+          <WeeklyLessons trades={trades}/>
         </div>
       )}
 

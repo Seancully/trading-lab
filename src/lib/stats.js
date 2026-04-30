@@ -54,9 +54,46 @@ export function calcStats(trades, accountFilter = null) {
   let cum = 0;
   const equity = sorted.map(t => { cum += eff(t); return { date: t.date, value: cum }; });
 
+  // Per-metric rolling series (one point per trade, in chronological order)
+  // — used to drive metric-specific sparklines on the dashboard. Each card
+  // gets a line that actually reflects its own number's history rather than
+  // re-tinting the equity curve.
+  const series = (() => {
+    const winRate = [], pf = [], avgRWin = [], dd = [], rules = [];
+    let w = 0, l = 0, b = 0;
+    let gw = 0, gl = 0;
+    let rWinSum = 0, rWinN = 0;
+    let peakRun = 0, run = 0;
+    let rulesSum = 0, rulesN = 0;
+    for (const t of sorted) {
+      if (t.result === 'Win') w++;
+      else if (t.result === 'Loss') l++;
+      else if (t.result === 'BE') b++;
+      const total = w + l + b;
+      winRate.push(total ? (w / total) * 100 : 0);
+
+      const e = eff(t);
+      if (t.result === 'Win') gw += e;
+      if (t.result === 'Loss') gl += Math.abs(e);
+      pf.push(gl === 0 ? (gw > 0 ? gw : 0) : gw / gl);
+
+      if (t.result === 'Win') { rWinSum += Number(t.rMultiple) || 0; rWinN++; }
+      avgRWin.push(rWinN ? rWinSum / rWinN : 0);
+
+      run += e;
+      if (run > peakRun) peakRun = run;
+      dd.push(peakRun - run);
+
+      if (t.rulesScore > 0) { rulesSum += t.rulesScore; rulesN++; }
+      rules.push(rulesN ? rulesSum / rulesN : 0);
+    }
+    return { winRate, pf, avgRWin, dd, rules };
+  })();
+
   return {
     total: trades.length, wins: wins.length, losses: losses.length, bes: bes.length,
     totalPnl, grossWin, grossLoss, profitFactor, winRate, avgRWin, avgRLoss,
     avgRulesScore, maxDD, bestDay, worstDay, streak, streakType, equity, byDay,
+    series,
   };
 }

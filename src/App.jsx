@@ -185,18 +185,19 @@ function Dashboard({ onNav, accountFilter }) {
       {stats && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 20 }}>
           {[
-            { label: 'Win Rate',       num: parseFloat(stats.winRate), fmt: (v) => v.toFixed(1) + '%', sub: `${stats.wins}W · ${stats.losses}L · ${stats.bes}BE` },
-            { label: 'Profit Factor',  num: isFinite(parseFloat(stats.profitFactor)) ? parseFloat(stats.profitFactor) : null, raw: !isFinite(parseFloat(stats.profitFactor)) ? stats.profitFactor : null, fmt: (v) => v.toFixed(2), sub: `Gross win $${Math.round(stats.grossWin)}` },
-            { label: 'Avg R Won',      num: parseFloat(stats.avgRWin), fmt: (v) => '+' + v.toFixed(2) + 'R', sub: `Avg R Lost: ${stats.avgRLoss}R`, color: 'var(--bull)' },
-            { label: 'Max Drawdown',   num: Math.round(stats.maxDD), fmt: (v) => '-$' + Math.round(v).toLocaleString(), sub: `Best day +$${Math.round(stats.bestDay)}`, color: 'var(--bear)' },
+            { label: 'Win Rate',       num: parseFloat(stats.winRate), fmt: (v) => v.toFixed(1) + '%', sub: `${stats.wins}W · ${stats.losses}L · ${stats.bes}BE`, sparkData: stats.series?.winRate },
+            { label: 'Profit Factor',  num: isFinite(parseFloat(stats.profitFactor)) ? parseFloat(stats.profitFactor) : null, raw: !isFinite(parseFloat(stats.profitFactor)) ? stats.profitFactor : null, fmt: (v) => v.toFixed(2), sub: `Gross win $${Math.round(stats.grossWin)}`, sparkData: stats.series?.pf },
+            { label: 'Avg R Won',      num: parseFloat(stats.avgRWin), fmt: (v) => '+' + v.toFixed(2) + 'R', sub: `Avg R Lost: ${stats.avgRLoss}R`, color: 'var(--bull)', sparkData: stats.series?.avgRWin },
+            { label: 'Max Drawdown',   num: Math.round(stats.maxDD), fmt: (v) => '-$' + Math.round(v).toLocaleString(), sub: `Best day +$${Math.round(stats.bestDay)}`, color: 'var(--bear)', sparkData: stats.series?.dd },
             { label: 'Rules Score',    num: stats.avgRulesScore, fmt: (v) => Math.round(v) + '%',
               sub: 'Avg checklist pass',
-              color: stats.avgRulesScore >= 80 ? 'var(--bull)' : stats.avgRulesScore >= 60 ? 'var(--accent)' : 'var(--bear)' },
+              color: stats.avgRulesScore >= 80 ? 'var(--bull)' : stats.avgRulesScore >= 60 ? 'var(--accent)' : 'var(--bear)',
+              sparkData: stats.series?.rules },
           ].map(s => (
             <div key={s.label} className="stat-card">
-              {stats.equity.length >= 2 && (
+              {s.sparkData && s.sparkData.length >= 2 && (
                 <div className="stat-spark">
-                  <Sparkline data={stats.equity.map(e => e.value)} width={60} height={20} stroke={s.color} />
+                  <Sparkline data={s.sparkData} width={60} height={20} stroke={s.color} />
                 </div>
               )}
               <div className="stat-label">{s.label}</div>
