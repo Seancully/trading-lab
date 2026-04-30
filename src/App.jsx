@@ -450,7 +450,23 @@ export default function App() {
     ...NAV.map(n => ({ id: 'nav-' + n.id, label: 'Go to ' + n.label, group: 'Navigate', icon: n.icon, run: () => setPage(n.id) })),
     { id: 'new-trade',  label: 'Log new trade',         group: 'Actions', icon: 'plus',     kbd: 'N', run: () => { setPage('journal'); setTimeout(() => window.dispatchEvent(new CustomEvent('tl:newTrade')), 50); } },
     { id: 'new-setup',  label: 'New note',              group: 'Actions', icon: 'plus',     run: () => { setPage('setups');  setTimeout(() => window.dispatchEvent(new CustomEvent('tl:newSetup')), 50); } },
-    { id: 'new-review', label: 'New weekly review',     group: 'Actions', icon: 'journal',  run: () => { setPage('setups'); setTimeout(() => { const id = Store.createWeeklyReviewNote(); window.dispatchEvent(new CustomEvent('tl:openSetup', { detail: { id } })); toast.success('Weekly review created'); }, 50); } },
+    { id: 'new-review', label: 'New weekly review',     group: 'Actions', icon: 'journal',  run: () => {
+      setPage('setups');
+      setTimeout(async () => {
+        const id = Store.createWeeklyReviewNote();
+        window.dispatchEvent(new CustomEvent('tl:openSetup', { detail: { id } }));
+        try {
+          await navigator.clipboard.writeText(Store.exportWeekForClaude());
+          toast.success('Weekly review created · week data copied to clipboard');
+        } catch {
+          toast.success('Weekly review created');
+        }
+      }, 50);
+    } },
+    { id: 'copy-week', label: 'Copy week for Claude',    group: 'Actions', icon: 'journal',  run: async () => {
+      try { await navigator.clipboard.writeText(Store.exportWeekForClaude()); toast.success('Week data copied to clipboard'); }
+      catch { toast.error('Could not copy to clipboard'); }
+    } },
     { id: 'theme',      label: theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode', group: 'Actions', icon: theme === 'dark' ? 'sun' : 'moon', run: () => toggleTheme() },
     { id: 'settings',   label: 'Open settings',         group: 'Actions', icon: 'settings', run: () => setShowSettings(true) },
     ...(user ? [{ id: 'signout', label: 'Sign out',     group: 'Account', icon: 'logout',   run: () => handleSignOut() }] : []),

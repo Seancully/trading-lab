@@ -543,6 +543,88 @@ export const Store = {
 
   // Build a weekly-review note from the past 7 days of trades and save it.
   // Returns the new note's id.
+  // Plain-text dump of the current week (Mon–Sun) trade-by-trade. Designed
+  // to be pasted into a Claude chat alongside trade-card screenshots so
+  // Claude can help draft the weekly review. Returns one big string.
+  exportWeekForClaude() {
+    const trades = this.getTrades();
+    const now = new Date();
+    const offset = (now.getDay() + 6) % 7;
+    const start = new Date(now); start.setHours(0, 0, 0, 0); start.setDate(now.getDate() - offset);
+    const end = new Date(start); end.setDate(start.getDate() + 6);
+    const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const startStr = ymd(start), endStr = ymd(end);
+    const weekTrades = trades
+      .filter(t => t.date && t.date >= startStr && t.date <= endStr)
+      .sort((a, b) => `${a.date} ${a.time || ''}`.localeCompare(`${b.date} ${b.time || ''}`));
+
+    const wins = weekTrades.filter(t => t.result === 'Win').length;
+    const losses = weekTrades.filter(t => t.result === 'Loss').length;
+    const bes = weekTrades.filter(t => t.result === 'BE').length;
+    const totalPnl = weekTrades.reduce((s, t) => s + (Number(t.pnlDollars) || 0), 0);
+    const wr = weekTrades.length ? Math.round((wins / weekTrades.length) * 100) : 0;
+    const fmt = (v) => `${v >= 0 ? '+' : '-'}$${Math.abs(Math.round(v)).toLocaleString()}`;
+    const fmtR = (v) => `${v >= 0 ? '+' : ''}${Number(v || 0).toFixed(2)}R`;
+
+    const allRules = (this.getRules() || []).flatMap(cat => cat.rules.map(r => ({ ...r, category: cat.category })));
+    const ruleById = Object.fromEntries(allRules.map(r => [r.id, r]));
+
+    const skipCounts = {};
+    for (const r of allRules) skipCounts[r.id] = { rule: r, skipped: 0 };
+    const scored = weekTrades.filter(t => (t.rulesScore || 0) > 0);
+    for (const t of scored) {
+      const checks = t.rulesChecklist || {};
+      for (const r of allRules) if (!checks[r.id]) skipCounts[r.id].skipped++;
+    }
+    const topSkipped = Object.values(skipCounts)
+      .filter(x => x.skipped > 0)
+      .sort((a, b) => b.skipped - a.skipped)
+      .slice(0, 5);
+
+    const lines = [];
+    lines.push(`# Trading Week Export`);
+    lines.push(`Week: ${startStr} → ${endStr}`);
+    lines.push(`Summary: ${weekTrades.length} trades · ${wins}W · ${losses}L · ${bes}BE · ${wr}% WR · ${fmt(totalPnl)}`);
+    lines.push('');
+    if (!weekTrades.length) {
+      lines.push('No trades logged this week.');
+    } else {
+      lines.push(`## Trades`);
+      weekTrades.forEach((t, i) => {
+        const accounts = (t.accounts || []).map(a => `${a.name} ×${a.contracts || 1}`).join(', ') || '—';
+        const checks = t.rulesChecklist || {};
+        const skippedRules = allRules.filter(r => !checks[r.id]).map(r => r.text);
+        lines.push('');
+        lines.push(`### Trade ${i + 1} — ${t.date} ${t.time || ''} · ${t.instrument || '—'} · ${t.direction || '—'} · ${t.entryModel || '—'}`);
+        lines.push(`- Result: ${t.result || '—'} · ${fmtR(t.rMultiple)} · ${fmt(Number(t.pnlDollars) || 0)} · Rules ${t.rulesScore || 0}%`);
+        lines.push(`- Session: ${t.session || '—'} · HTF bias: ${t.htfBias || '—'}`);
+        lines.push(`- Accounts: ${accounts}`);
+        if ((t.confluences || []).length) lines.push(`- Confluences: ${t.confluences.join(', ')}`);
+        if (skippedRules.length && (t.rulesScore || 0) > 0) {
+          lines.push(`- Rules skipped: ${skippedRules.join('; ')}`);
+        }
+        if ((t.review || '').trim()) {
+          lines.push(`- Review:`);
+          t.review.trim().split('\n').forEach(l => lines.push(`    ${l}`));
+        }
+        if ((t.lesson || '').trim()) {
+          lines.push(`- Lesson:`);
+          t.lesson.trim().split('\n').forEach(l => lines.push(`    ${l}`));
+        }
+      });
+    }
+
+    if (topSkipped.length) {
+      lines.push('');
+      lines.push(`## Most-skipped rules this week`);
+      topSkipped.forEach(({ rule, skipped: n }) => {
+        lines.push(`- ${rule.category} — ${rule.text} (${n}/${scored.length})`);
+      });
+    }
+
+    return lines.join('\n');
+  },
+
   createWeeklyReviewNote() {
     const trades = this.getTrades();
     const now = new Date();
@@ -594,6 +676,7 @@ export const Store = {
     const blocks = [
       { id: uid(), type: 'h1',  text: `Week of ${monthName} – ${endName}` },
       { id: uid(), type: 'p',   text: `${weekTrades.length} trade${weekTrades.length === 1 ? '' : 's'} · ${wins}W · ${losses}L · ${bes}BE · ${winRate}% WR · ${fmt(totalPnl)}` },
+      { id: uid(), type: 'bq',  text: 'Fill this in with Claude: hit "Copy week for Claude" on the Performance tab (or use the toast below — it\'s already on your clipboard). Paste it into a chat with Claude, attach a screenshot of each trade card from the Journal, and ask Claude to help you draft the sections below. Then refine in your own words.' },
       { id: uid(), type: 'h2',  text: 'The numbers' },
       { id: uid(), type: 'li',  text: `Total P&L: ${fmt(totalPnl)}` },
       { id: uid(), type: 'li',  text: `Best day: ${fmt(bestDay)} · Worst day: ${fmt(worstDay)}` },

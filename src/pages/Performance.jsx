@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Store, effectivePnl } from '../lib/store.js';
 import { calcStats } from '../lib/stats.js';
 import { Tabs, StatCard, Empty, Icon, Badge, DirBadge, PnlText, Btn } from '../components/Shared.jsx';
+import { toast } from '../lib/toast.js';
 
 // ── Equity curve canvas ───────────────────────────────────────────────────────
 export function EquityCurve({ equity }) {
@@ -533,10 +534,18 @@ function WeeklyLessons({ trades }) {
 
   return (
     <div className="card">
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8, flexWrap: 'wrap' }}>
         <div className="card-title" style={{ margin: 0 }}>Lessons This Week</div>
-        <div style={{ fontSize: 11, color: 'var(--text3)' }}>
-          Mon–Sun · {lessons.length} lesson{lessons.length === 1 ? '' : 's'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ fontSize: 11, color: 'var(--text3)' }}>
+            Mon–Sun · {lessons.length} lesson{lessons.length === 1 ? '' : 's'}
+          </div>
+          <Btn variant="ghost" size="sm" onClick={async () => {
+            try { await navigator.clipboard.writeText(Store.exportWeekForClaude()); toast.success('Week data copied · paste into Claude with trade screenshots'); }
+            catch { toast.error('Could not copy to clipboard'); }
+          }}>
+            <Icon name="upload" size={12}/>Copy week for Claude
+          </Btn>
         </div>
       </div>
       {lessons.length === 0 ? (
