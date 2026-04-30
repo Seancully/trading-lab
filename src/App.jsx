@@ -21,7 +21,7 @@ const NAV = [
   { id: 'dashboard',   label: 'Dashboard',    icon: 'dashboard' },
   { id: 'journal',     label: 'Journal',      icon: 'journal' },
   { id: 'rules',       label: 'My Rules',     icon: 'rules' },
-  { id: 'confluences', label: 'Confluences',  icon: 'rules' },
+  { id: 'confluences', label: 'Confluences',  icon: 'confluences' },
   { id: 'setups',      label: 'Notes',        icon: 'setups' },
   { id: 'performance', label: 'Performance',  icon: 'perf' },
   { id: 'calendar',    label: 'Calendar',     icon: 'calendar' },
@@ -193,14 +193,33 @@ function Dashboard({ onNav, accountFilter }) {
       {stats && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 20 }}>
           {[
-            { label: 'Win Rate',       num: parseFloat(stats.winRate), fmt: (v) => v.toFixed(1) + '%', sub: `${stats.wins}W · ${stats.losses}L · ${stats.bes}BE`, sparkData: stats.series?.winRate },
-            { label: 'Profit Factor',  num: isFinite(parseFloat(stats.profitFactor)) ? parseFloat(stats.profitFactor) : null, raw: !isFinite(parseFloat(stats.profitFactor)) ? stats.profitFactor : null, fmt: (v) => v.toFixed(2), sub: `Gross win $${Math.round(stats.grossWin)}`, sparkData: stats.series?.pf },
-            { label: 'Avg R Won',      num: parseFloat(stats.avgRWin), fmt: (v) => '+' + v.toFixed(2) + 'R', sub: `Avg R Lost: ${stats.avgRLoss}R`, color: 'var(--bull)', sparkData: stats.series?.avgRWin },
-            { label: 'Max Drawdown',   num: Math.round(stats.maxDD), fmt: (v) => '-$' + Math.round(v).toLocaleString(), sub: `Best day +$${Math.round(stats.bestDay)}`, color: 'var(--bear)', sparkData: stats.series?.dd },
-            { label: 'Rules Score',    num: stats.avgRulesScore, fmt: (v) => Math.round(v) + '%',
+            { label: 'Win Rate',
+              num: parseFloat(stats.winRate), fmt: (v) => v.toFixed(1) + '%',
+              sub: `${stats.wins}W · ${stats.losses}L · ${stats.bes}BE`,
+              bar: parseFloat(stats.winRate) / 100,
+              barColor: parseFloat(stats.winRate) >= 50 ? 'var(--bull)' : 'var(--bear)' },
+            { label: 'Profit Factor',
+              num: isFinite(parseFloat(stats.profitFactor)) ? parseFloat(stats.profitFactor) : null,
+              raw: !isFinite(parseFloat(stats.profitFactor)) ? stats.profitFactor : null,
+              fmt: (v) => v.toFixed(2), sub: `Gross win $${Math.round(stats.grossWin)}`,
+              bar: Math.min((parseFloat(stats.profitFactor) || 0) / 3, 1),
+              barColor: parseFloat(stats.profitFactor) >= 1.5 ? 'var(--bull)' : parseFloat(stats.profitFactor) >= 1 ? 'var(--accent)' : 'var(--bear)' },
+            { label: 'Avg R Won',
+              num: parseFloat(stats.avgRWin), fmt: (v) => '+' + v.toFixed(2) + 'R',
+              sub: `Avg R Lost: ${stats.avgRLoss}R`, color: 'var(--bull)',
+              bar: Math.min((parseFloat(stats.avgRWin) || 0) / 3, 1),
+              barColor: 'var(--bull)' },
+            { label: 'Max Drawdown',
+              num: Math.round(stats.maxDD), fmt: (v) => '-$' + Math.round(v).toLocaleString(),
+              sub: `Best day +$${Math.round(stats.bestDay)}`, color: 'var(--bear)',
+              bar: stats.bestDay > 0 ? Math.min(stats.maxDD / stats.bestDay, 1) : 0,
+              barColor: 'var(--bear)' },
+            { label: 'Rules Score',
+              num: stats.avgRulesScore, fmt: (v) => Math.round(v) + '%',
               sub: 'Avg checklist pass',
               color: stats.avgRulesScore >= 80 ? 'var(--bull)' : stats.avgRulesScore >= 60 ? 'var(--accent)' : 'var(--bear)',
-              sparkData: stats.series?.rules },
+              bar: stats.avgRulesScore / 100,
+              barColor: stats.avgRulesScore >= 80 ? 'var(--bull)' : stats.avgRulesScore >= 60 ? 'var(--accent)' : 'var(--bear)' },
           ].map(s => (
             <div key={s.label} className="stat-card">
               <div className="stat-label">{s.label}</div>
@@ -208,6 +227,11 @@ function Dashboard({ onNav, accountFilter }) {
                 {s.raw ?? (s.num == null ? '—' : <AnimatedNumber value={s.num} format={s.fmt}/>)}
               </div>
               {s.sub && <div className="stat-sub">{s.sub}</div>}
+              {s.bar != null && s.bar > 0 && (
+                <div style={{ height: 3, background: 'var(--border2)', borderRadius: 2, marginTop: 8, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${Math.min(s.bar * 100, 100)}%`, background: s.barColor, borderRadius: 2, transition: 'width 0.5s ease' }}/>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -237,10 +261,15 @@ function Dashboard({ onNav, accountFilter }) {
             : <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
                 {recent.map((t, i) => (
                   <div key={t.id} style={{
-                    display: 'flex', flexDirection: 'column', gap: 6,
-                    padding: '10px 0',
+                    display: 'flex', alignItems: 'stretch',
                     borderBottom: i < recent.length - 1 ? '1px solid var(--border)' : 'none',
                   }}>
+                    <div style={{
+                      width: 3, flexShrink: 0, borderRadius: 2,
+                      margin: '10px 10px 10px 0',
+                      background: t.result === 'Win' ? 'var(--bull)' : t.result === 'Loss' ? 'var(--bear)' : 'var(--be)',
+                    }}/>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 0' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                       <DirBadge dir={t.direction}/>
                       <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{t.entryModel}</div>
@@ -251,6 +280,7 @@ function Dashboard({ onNav, accountFilter }) {
                         <Badge result={t.result}/>
                         <PnlText value={eff(t)} size={13}/>
                       </div>
+                    </div>
                     </div>
                   </div>
                 ))}

@@ -284,6 +284,9 @@ export function CalendarView({ byDay, trades = [], accountFilter = null }) {
   const monthBestDay = monthByDay.length ? Math.max(...monthByDay.map(([, v]) => v)) : 0;
   const monthWorstDay = monthByDay.length ? Math.min(...monthByDay.map(([, v]) => v)) : 0;
   const monthTradedDays = monthByDay.filter(([, v]) => v !== 0).length;
+  // Intensity anchor for calendar shading — best profit day = full green, scaled down from there.
+  const maxPosPnl = Math.max(...monthByDay.map(([, v]) => v).filter(v => v > 0), 1);
+  const maxNegPnl = Math.abs(Math.min(...monthByDay.map(([, v]) => v).filter(v => v < 0), -1));
 
   const dayHeaders = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
@@ -340,7 +343,17 @@ export function CalendarView({ byDay, trades = [], accountFilter = null }) {
             let bg = 'var(--surface)';
             let pnlColor = 'var(--text3)';
             if (hasTrade && inMonth) {
-              bg = pnl > 0 ? 'var(--bullDim)' : pnl < 0 ? 'var(--bearDim)' : 'var(--beDim)';
+              if (pnl > 0) {
+                const intensity = Math.min(pnl / maxPosPnl, 1);
+                const alpha = (0.08 + 0.22 * intensity).toFixed(3);
+                bg = `rgba(34,197,94,${alpha})`;
+              } else if (pnl < 0) {
+                const intensity = Math.min(Math.abs(pnl) / maxNegPnl, 1);
+                const alpha = (0.08 + 0.18 * intensity).toFixed(3);
+                bg = `rgba(244,63,94,${alpha})`;
+              } else {
+                bg = 'var(--beDim)';
+              }
               pnlColor = pnl > 0 ? 'var(--bull)' : pnl < 0 ? 'var(--bear)' : 'var(--be)';
             }
             return (

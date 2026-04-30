@@ -39,6 +39,15 @@ export function tradeFingerprint(t) {
   ].join('|');
 }
 
+// Lenient fingerprint for LIVE dedup only — ignores time so two records for
+// the same logical trade that were created on different devices (with different
+// entry-time values or no time at all) are still recognised as duplicates.
+// NOT used for tombstones — tombstones use the strict fingerprint above.
+function leniFingerprint(t) {
+  if (!t) return '';
+  return [t.date || '', t.entryModel || '', Math.round(Number(t.pnlDollars) || 0), t.direction || ''].join('|');
+}
+
 // Per-trade P&L weighted by selected accounts.
 // `pnlDollars` on a trade is per-contract; each account on the trade carries
 // its own contract count. The effective P&L for a given filter is:
@@ -311,17 +320,28 @@ export const Sync = {
             .map(t => [t.id, t])
         );
         const merged = Object.values({ ...remoteMap, ...localMap });
-        localStorage.setItem(KEYS.trades, JSON.stringify(merged));
+        // Lenient-fingerprint dedup across the merged set. Cross-device sync can
+        // produce two records for the same logical trade with different IDs (or
+        // the same ID but different time strings). Keep the record with the
+        // lexicographically larger ID (timestamp-based UIDs → newer wins).
+        const lfSeen = new Map();
         for (const t of merged) {
+          const lfp = leniFingerprint(t);
+          if (!lfSeen.has(lfp) || t.id > lfSeen.get(lfp).id) lfSeen.set(lfp, t);
+        }
+        const deduped = [...lfSeen.values()];
+        const keptIds = new Set(deduped.map(t => t.id));
+        localStorage.setItem(KEYS.trades, JSON.stringify(deduped));
+        for (const t of deduped) {
           if (!remoteMap[t.id]) await this.push('trade_' + t.id, t);
         }
-        // Mop up: any remote row that's tombstoned (by id or fingerprint)
-        // still in remote → kill it.
+        // Mop up: tombstoned rows + lenient-dup rows still in Supabase.
         for (const r of remoteTrades) {
           if (!r.value) continue;
           const matchesId = r.value.id && tombstoneSet.has(r.value.id);
           const matchesFp = fpSet.has(tradeFingerprint(r.value));
-          if (matchesId || matchesFp) {
+          const isDupe = r.value.id && !keptIds.has(r.value.id) && !matchesId && !matchesFp;
+          if (matchesId || matchesFp || isDupe) {
             await this.deleteKey(r.key);
           }
         }
@@ -460,7 +480,11 @@ export const Store = {
     const ids = this.getDeletedTradeIds?.() ?? new Set();
     let mutated = false;
     const out = [];
-    const seenFps = new Set(); // guard against live duplicates (cross-device sync can create same trade with two IDs)
+    // Two-tier live dedup: strict (exact match) + lenient (ignores time).
+    // The lenient check catches the common cross-device case where the same
+    // trade was saved with different time values on two devices.
+    const seenStrict = new Set();
+    const seenLenient = new Set();
     for (const t of raw) {
       if (!t || typeof t !== 'object') { mutated = true; continue; }
       const pnl = Number(t.pnlDollars) || 0;
@@ -469,9 +493,11 @@ export const Store = {
       const hasContent = pnl !== 0 || r !== 0 || (hasResult && t.date);
       if (!hasContent) { mutated = true; continue; } // husk
       if (ids.has(t.id) || fps.has(tradeFingerprint(t))) { mutated = true; continue; }
-      const fp = tradeFingerprint(t);
-      if (seenFps.has(fp)) { mutated = true; continue; } // live duplicate — keep first occurrence
-      seenFps.add(fp);
+      const sfp = tradeFingerprint(t);
+      const lfp = leniFingerprint(t);
+      if (seenStrict.has(sfp) || seenLenient.has(lfp)) { mutated = true; continue; }
+      seenStrict.add(sfp);
+      seenLenient.add(lfp);
       if (!t.id) {
         mutated = true;
         out.push({ ...t, id: uid() });
