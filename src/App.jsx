@@ -608,7 +608,7 @@ export default function App() {
         </div>
 
         <ErrorBoundary key={page}>
-        <div className="main-content page-transition">
+        <div className="main-content page-transition" data-page={page}>
           {page === 'dashboard'   && <Dashboard onNav={setPage} accountFilter={accountFilter}/>}
           {page === 'journal'     && (
             <Journal
