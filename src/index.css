@@ -812,3 +812,13 @@ body.light .form-select option { background: #ffffff; color: #0A0A0C; }
 .account-filter-menu .row-check.on {
   background: var(--accent); border-color: var(--accent); color: var(--bg);
 }
+
+/* ── Topnav quote ───────────────────────────────────────────────────────── */
+.topnav-quote {
+  margin-left: 16px; padding-left: 16px;
+  border-left: 1px solid var(--border);
+  font-family: var(--font); font-size: 12px; font-style: italic;
+  color: var(--text3); letter-spacing: 0.01em;
+  user-select: none; flex-shrink: 0; white-space: nowrap;
+}
+@media (max-width: 720px) { .topnav-quote { display: none; } }

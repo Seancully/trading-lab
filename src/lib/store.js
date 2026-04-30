@@ -191,6 +191,7 @@ function makeSample() {
     const pnl = +(r * risk).toFixed(0);
     const direction = directions[Math.floor(Math.random() * 2)];
     samples.push({
+      _sample: true,
       id: uid(),
       date: d.toISOString().slice(0, 10), time: '',
       instrument: Math.random() > 0.3 ? 'MNQ' : 'MES',
@@ -395,6 +396,45 @@ export const Store = {
     localStorage.setItem(KEYS.trades, JSON.stringify(s));
     for (const t of s) Sync.push('trade_' + t.id, t);
     return s;
+  },
+
+  // Heuristic: matches the exact shape produced by makeSample() for legacy
+  // samples that pre-date the _sample flag. A real journal entry won't match
+  // every field at once.
+  isSampleTrade(t) {
+    if (!t || typeof t !== 'object') return false;
+    if (t._sample === true) return true;
+    const sampleModels = ['IFVG', 'HTF PDA → IFVG', 'Internal → External', 'SMT + IFVG', 'OB + CE'];
+    const sampleConfluences = ['HTF PDA', 'IFVG', 'Strong DOL'];
+    const oneAccount = Array.isArray(t.accounts) && t.accounts.length === 1
+      && t.accounts[0]?.name === 'MNQ Main' && t.accounts[0]?.contracts === 1;
+    const emptyReview = (t.review ?? '') === '' && (t.lesson ?? '') === '';
+    const noShot = !t.screenshotUrl;
+    const flatOutlook = t.outlook && t.outlook.mnqImageUrl == null && t.outlook.mesImageUrl == null && (t.outlook.notes ?? '') === '';
+    const sampleModel = sampleModels.includes(t.entryModel);
+    const cnf = Array.isArray(t.confluences) ? t.confluences : [];
+    const onlySampleConfluences = cnf.length > 0 && cnf.every(c => sampleConfluences.includes(c));
+    return oneAccount && emptyReview && noShot && flatOutlook && sampleModel && onlySampleConfluences;
+  },
+
+  // How many of the user's trades look like samples — surface a count before
+  // we delete anything.
+  countSampleTrades() {
+    return this.getTrades().filter(t => this.isSampleTrade(t)).length;
+  },
+
+  // Removes sample trades both from localStorage AND from Supabase, so they
+  // don't re-appear on the next sync from another device.
+  async removeSampleTrades() {
+    const all = this.getTrades();
+    const samples = all.filter(t => this.isSampleTrade(t));
+    if (!samples.length) return { removed: 0 };
+    const keep = all.filter(t => !this.isSampleTrade(t));
+    localStorage.setItem(KEYS.trades, JSON.stringify(keep));
+    for (const t of samples) {
+      try { await Sync.deleteKey('trade_' + t.id); } catch { /* noop */ }
+    }
+    return { removed: samples.length };
   },
 
   // Build a weekly-review note from the past 7 days of trades and save it.

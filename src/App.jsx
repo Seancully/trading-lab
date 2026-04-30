@@ -293,6 +293,8 @@ function SettingsModal({ settings, onSave, onClose }) {
           </div>
         </div>
 
+        <SampleDataRow />
+
         <div style={{ fontSize: 11, color: 'var(--text3)', lineHeight: 1.6, padding: '10px 12px', background: 'var(--bg)', borderRadius: 6, border: '1px solid var(--border)' }}>
           {supabaseConfigured
             ? 'Cross-device sync is active when signed in. Your data is private to your account.'
@@ -300,6 +302,39 @@ function SettingsModal({ settings, onSave, onClose }) {
         </div>
       </div>
     </Modal>
+  );
+}
+
+function SampleDataRow() {
+  const [count, setCount] = useState(() => Store.countSampleTrades());
+  const [busy, setBusy] = useState(false);
+
+  const handleRemove = async () => {
+    if (!count) return;
+    if (!window.confirm(`Remove ${count} sample trade${count === 1 ? '' : 's'}? Your real logged trades stay.`)) return;
+    setBusy(true);
+    const { removed } = await Store.removeSampleTrades();
+    setBusy(false);
+    setCount(Store.countSampleTrades());
+    toast.success(`${removed} sample trade${removed === 1 ? '' : 's'} removed`);
+  };
+
+  if (!count) return null;
+  return (
+    <div style={{
+      padding: '12px 14px', background: 'var(--surface2)', border: '1px solid var(--border2)',
+      borderRadius: 8, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+    }}>
+      <div style={{ flex: 1, minWidth: 200 }}>
+        <div style={{ fontSize: 13, fontWeight: 600 }}>Sample data detected</div>
+        <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
+          {count} trade{count === 1 ? '' : 's'} look like the seeded sample data. Remove them — your real trades stay.
+        </div>
+      </div>
+      <Btn variant="danger" size="sm" onClick={handleRemove} disabled={busy}>
+        {busy ? 'Removing…' : `Remove ${count}`}
+      </Btn>
+    </div>
   );
 }
 
@@ -473,6 +508,7 @@ export default function App() {
           <h1>Trading Lab</h1>
           <p>ICT · MNQ / MES</p>
         </div>
+        <div className="topnav-quote" aria-hidden>Paid for patience.</div>
 
         <div className="topnav-items">
           {NAV.map(item => (
