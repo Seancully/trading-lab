@@ -571,6 +571,22 @@ export const Store = {
     }
     const topModels = Object.entries(byModel).sort((a, b) => b[1] - a[1]).slice(0, 3);
 
+    // Most-skipped rules across this week's rules-scored trades.
+    const scoredTrades = weekTrades.filter(t => (t.rulesScore || 0) > 0);
+    const allRules = (this.getRules() || []).flatMap(cat => cat.rules.map(r => ({ ...r, category: cat.category })));
+    const skipCounts = {};
+    for (const r of allRules) skipCounts[r.id] = { rule: r, skipped: 0 };
+    for (const t of scoredTrades) {
+      const checks = t.rulesChecklist || {};
+      for (const r of allRules) {
+        if (!checks[r.id]) skipCounts[r.id].skipped++;
+      }
+    }
+    const topSkipped = Object.values(skipCounts)
+      .filter(x => x.skipped > 0)
+      .sort((a, b) => b.skipped - a.skipped)
+      .slice(0, 5);
+
     const fmt = (v) => `${v >= 0 ? '+' : '-'}$${Math.abs(Math.round(v)).toLocaleString()}`;
     const monthName = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const endName = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -591,6 +607,16 @@ export const Store = {
       { id: uid(), type: 'li',  text: '' },
       { id: uid(), type: 'h2',  text: 'Adjustments for next week' },
       { id: uid(), type: 'li',  text: '' },
+      { id: uid(), type: 'h2',  text: 'Most-skipped rules' },
+      { id: uid(), type: 'p',   text: 'Fix these:' },
+      ...(topSkipped.length
+        ? topSkipped.map(({ rule, skipped: count }) => ({
+            id: uid(), type: 'li',
+            text: `${rule.category} — ${rule.text} (${count}/${scoredTrades.length})`,
+          }))
+        : [{ id: uid(), type: 'li', text: scoredTrades.length === 0
+            ? 'No rules-scored trades this week.'
+            : 'Clean week — every rule on every trade.' }]),
       { id: uid(), type: 'bq',  text: 'Did I follow my rules? Where did I deviate, and why?' },
     ];
 
