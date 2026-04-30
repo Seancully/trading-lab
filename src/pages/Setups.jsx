@@ -782,15 +782,31 @@ export default function Setups() {
         {selected
           ? <NoteEditor key={selected.id} note={selected} onSave={handleSave} onDelete={handleDelete} onBack={() => setSelectedId(null)}/>
           : (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: 'var(--text3)', padding: 32, textAlign: 'center' }}>
-              <div style={{ fontSize: 28, opacity: 0.25 }}>📝</div>
-              <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text2)' }}>Select a note or create a new one</div>
-              <div style={{ fontSize: 12 }}>
-                Type <kbd style={{ padding: '2px 6px', background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: 4, fontFamily: 'var(--mono)', fontSize: 11 }}>/</kbd> inside a note to insert blocks
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, color: 'var(--text3)', padding: 32, textAlign: 'center' }}>
+              <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text3)', opacity: 0.45 }}>
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                <path d="M14 2v6h6"/>
+                <path d="M8 13h8M8 17h6M8 9h2"/>
+              </svg>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>Your trading playbook</div>
+                <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>Notes, weekly reviews, setup write-ups — all in one place.</div>
               </div>
-              <Btn variant="ghost" size="sm" onClick={createNote} style={{ marginTop: 4 }}>
-                <Icon name="plus" size={12}/> New Note
-              </Btn>
+              <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
+                <Btn variant="primary" size="sm" onClick={createNote}>
+                  <Icon name="plus" size={12}/> New Note
+                </Btn>
+                <Btn variant="ghost" size="sm" onClick={() => {
+                  const id = Store.createWeeklyReviewNote();
+                  setNotes(Store.getNotes());
+                  setSelectedId(id);
+                }}>
+                  <Icon name="journal" size={12}/> New Weekly Review
+                </Btn>
+              </div>
+              <div style={{ fontSize: 11, marginTop: 8 }}>
+                Tip: type <kbd style={{ padding: '2px 6px', background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: 4, fontFamily: 'var(--mono)', fontSize: 10 }}>/</kbd> inside a note to insert blocks
+              </div>
             </div>
           )
         }

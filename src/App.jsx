@@ -120,15 +120,30 @@ function AccountFilterPill({ accounts, value, onChange }) {
   );
 }
 
-function PnlChip({ value, label }) {
+function PnlChip({ value, label, delta, scale = 1 }) {
   const pos = value > 0, neg = value < 0;
+  // `scale` is a 0..1 emphasis multiplier — Today gets full intensity, week
+  // medium, month muted. Keeps the three chips visually distinct rather than
+  // three identical green boxes.
+  const tint = pos ? 'bull' : neg ? 'bear' : 'be';
+  const bgAlpha = 0.10 + 0.10 * scale;
+  const borderAlpha = 0.18 + 0.14 * scale;
+  const tintRgb = tint === 'bull' ? '34,197,94' : tint === 'bear' ? '244,63,94' : '148,163,184';
+  const showDelta = delta !== undefined && delta !== null && Number.isFinite(delta);
   return (
     <div style={{
-      background: pos ? 'var(--bullDim)' : neg ? 'var(--bearDim)' : 'var(--beDim)',
-      border: `1px solid ${pos ? 'rgba(34,197,94,0.2)' : neg ? 'rgba(244,63,94,0.2)' : 'rgba(148,163,184,0.2)'}`,
+      background: `rgba(${tintRgb}, ${bgAlpha})`,
+      border: `1px solid rgba(${tintRgb}, ${borderAlpha})`,
       borderRadius: 8, padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: 3,
     }}>
-      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text3)' }}>{label}</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text3)' }}>{label}</div>
+        {showDelta && (
+          <div style={{ fontSize: 10, fontFamily: 'var(--mono)', color: delta > 0 ? 'var(--bull)' : delta < 0 ? 'var(--bear)' : 'var(--text3)' }}>
+            {delta > 0 ? '▲' : delta < 0 ? '▼' : '·'} {delta >= 0 ? '+' : '-'}${Math.abs(Math.round(delta)).toLocaleString()}
+          </div>
+        )}
+      </div>
       <div style={{ fontFamily: 'var(--mono)', fontSize: 20, fontWeight: 700,
         color: pos ? 'var(--bull)' : neg ? 'var(--bear)' : 'var(--be)' }}>
         {value >= 0 ? '+' : ''}${Math.abs(value).toLocaleString()}
@@ -143,19 +158,31 @@ function Dashboard({ onNav, accountFilter }) {
   const stats  = useMemo(() => calcStats(trades, accountFilter), [trades, accountFilter]);
   const recent = trades.slice(0, 6);
 
-  const today     = new Date().toISOString().slice(0, 10);
-  const weekStart = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
-  const weekStr   = weekStart.toISOString().slice(0, 10);
-  const monthStr  = today.slice(0, 7);
+  const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const now = new Date();
+  const today = ymd(now);
+  const yesterday = (() => { const d = new Date(now); d.setDate(d.getDate() - 1); return ymd(d); })();
+  const weekStart = (() => { const d = new Date(now); const dow = d.getDay(); d.setDate(d.getDate() - ((dow + 6) % 7)); d.setHours(0,0,0,0); return d; })();
+  const prevWeekStart = (() => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); return d; })();
+  const monthStart = ymd(new Date(now.getFullYear(), now.getMonth(), 1));
+  const prevMonthStart = ymd(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+  const prevMonthEnd = ymd(new Date(now.getFullYear(), now.getMonth(), 0));
 
   const todayTrades  = trades.filter(t => t.date === today);
-  const weekTrades   = trades.filter(t => (t.date || '') >= weekStr);
-  const monthTrades  = trades.filter(t => (t.date || '').startsWith(monthStr));
+  const yestTrades   = trades.filter(t => t.date === yesterday);
+  const weekTrades   = trades.filter(t => (t.date || '') >= ymd(weekStart));
+  const prevWeekTrades = trades.filter(t => (t.date || '') >= ymd(prevWeekStart) && (t.date || '') < ymd(weekStart));
+  const monthTrades  = trades.filter(t => (t.date || '') >= monthStart);
+  const prevMonthTrades = trades.filter(t => (t.date || '') >= prevMonthStart && (t.date || '') <= prevMonthEnd);
 
   const eff = (t) => effectivePnl(t, accountFilter);
-  const todayPnl  = todayTrades.reduce((s, t) => s + eff(t), 0);
-  const weekPnl   = weekTrades.reduce((s, t) => s + eff(t), 0);
-  const monthPnl  = monthTrades.reduce((s, t) => s + eff(t), 0);
+  const sumPnl = (arr) => arr.reduce((s, t) => s + eff(t), 0);
+  const todayPnl  = sumPnl(todayTrades);
+  const weekPnl   = sumPnl(weekTrades);
+  const monthPnl  = sumPnl(monthTrades);
+  const yestPnl   = sumPnl(yestTrades);
+  const prevWeekPnl = sumPnl(prevWeekTrades);
+  const prevMonthPnl = sumPnl(prevMonthTrades);
 
   const greet = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening';
   const dateLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
@@ -176,9 +203,9 @@ function Dashboard({ onNav, accountFilter }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginBottom: 20 }}>
-        <PnlChip value={todayPnl} label={`Today · ${todayTrades.length} trade${todayTrades.length !== 1 ? 's' : ''}`}/>
-        <PnlChip value={weekPnl}  label={`This week · ${weekTrades.length} trade${weekTrades.length !== 1 ? 's' : ''}`}/>
-        <PnlChip value={monthPnl} label={`This month · ${monthTrades.length} trade${monthTrades.length !== 1 ? 's' : ''}`}/>
+        <PnlChip value={todayPnl} scale={1.0} delta={yestTrades.length      ? todayPnl - yestPnl       : null} label={`Today · ${todayTrades.length} trade${todayTrades.length !== 1 ? 's' : ''}`}/>
+        <PnlChip value={weekPnl}  scale={0.6} delta={prevWeekTrades.length  ? weekPnl  - prevWeekPnl   : null} label={`This week · ${weekTrades.length} trade${weekTrades.length !== 1 ? 's' : ''}`}/>
+        <PnlChip value={monthPnl} scale={0.25} delta={prevMonthTrades.length ? monthPnl - prevMonthPnl : null} label={`This month · ${monthTrades.length} trade${monthTrades.length !== 1 ? 's' : ''}`}/>
       </div>
 
       {stats && (
@@ -204,13 +231,13 @@ function Dashboard({ onNav, accountFilter }) {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(280px, 380px)', gap: 16 }} className="dashboard-bottom">
-        <div className="card" style={{ padding: '20px 22px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(280px, 380px)', gap: 16, alignItems: 'stretch' }} className="dashboard-bottom">
+        <div className="card" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <div className="card-title" style={{ margin: 0 }}>Equity Curve</div>
             <button onClick={() => onNav('performance')} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)' }}>Full view →</button>
           </div>
-          <div style={{ height: 200 }}>
+          <div style={{ flex: 1, minHeight: 240 }}>
             {stats && stats.equity.length >= 2
               ? <EquityCurve equity={stats.equity}/>
               : <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 12 }}>Log trades to see equity curve</div>
@@ -218,28 +245,34 @@ function Dashboard({ onNav, accountFilter }) {
           </div>
         </div>
 
-        <div className="card" style={{ padding: '20px 22px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div className="card" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <div className="card-title" style={{ margin: 0 }}>Recent Trades</div>
             <button onClick={() => onNav('journal')} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)' }}>All →</button>
           </div>
           {recent.length === 0
             ? <div style={{ color: 'var(--text3)', fontSize: 12, padding: '20px 0', textAlign: 'center' }}>No trades yet</div>
-            : recent.map((t, i) => (
-              <div key={t.id} style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '9px 0',
-                borderBottom: i < recent.length - 1 ? '1px solid var(--border)' : 'none',
-              }}>
-                <DirBadge dir={t.direction}/>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.entryModel}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 1 }}>{t.date} · {t.instrument}</div>
-                </div>
-                <Badge result={t.result}/>
-                <PnlText value={eff(t)} size={13}/>
+            : <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                {recent.map((t, i) => (
+                  <div key={t.id} style={{
+                    display: 'flex', flexDirection: 'column', gap: 6,
+                    padding: '10px 0',
+                    borderBottom: i < recent.length - 1 ? '1px solid var(--border)' : 'none',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                      <DirBadge dir={t.direction}/>
+                      <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{t.entryModel}</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ fontSize: 10, color: 'var(--text3)' }}>{t.date} · {t.instrument}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Badge result={t.result}/>
+                        <PnlText value={eff(t)} size={13}/>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))
           }
         </div>
       </div>

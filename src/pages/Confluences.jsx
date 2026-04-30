@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Store } from '../lib/store.js';
 import { Icon, Btn, Empty } from '../components/Shared.jsx';
 
-function Item({ item, catId, onEdit, onDelete }) {
+function Item({ item, catId, onEdit, onDelete, usage, totalTrades }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(item.text);
 
@@ -34,6 +34,14 @@ function Item({ item, catId, onEdit, onDelete }) {
       ) : (
         <span style={{ flex: 1, fontSize: 13, color: 'var(--text)' }}>{item.text}</span>
       )}
+      {totalTrades > 0 && (
+        <span title={`Tagged on ${usage || 0}/${totalTrades} trades`} style={{
+          fontSize: 10, fontFamily: 'var(--mono)', flexShrink: 0,
+          color: usage > 0 ? 'var(--accent)' : 'var(--text3)',
+        }}>
+          {usage > 0 ? `${usage}× used` : 'unused'}
+        </span>
+      )}
       <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
         <button onClick={() => setEditing(!editing)}
           style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: 4, borderRadius: 4, display: 'flex' }}
@@ -46,7 +54,7 @@ function Item({ item, catId, onEdit, onDelete }) {
   );
 }
 
-function CategoryBlock({ cat, onAddItem, onEditItem, onDeleteItem, onEditCatName, onDeleteCat }) {
+function CategoryBlock({ cat, onAddItem, onEditItem, onDeleteItem, onEditCatName, onDeleteCat, usage, totalTrades }) {
   const [addingText, setAddingText] = useState('');
   const [editingCat, setEditingCat] = useState(false);
   const [catName, setCatName] = useState(cat.category);
@@ -94,6 +102,7 @@ function CategoryBlock({ cat, onAddItem, onEditItem, onDeleteItem, onEditCatName
       )}
       {cat.items.map(item => (
         <Item key={item.id} item={item} catId={cat.id}
+          usage={usage?.[item.text] || 0} totalTrades={totalTrades}
           onEdit={onEditItem} onDelete={onDeleteItem}/>
       ))}
 
@@ -138,6 +147,15 @@ export default function Confluences() {
 
   const total = cnf.reduce((s, c) => s + c.items.length, 0);
 
+  // Confluence usage across logged trades. Tells the user which confluences
+  // they actually trade with vs which are aspirational dead weight.
+  const { usage, totalTrades } = useMemo(() => {
+    const trades = Store.getTrades();
+    const u = {};
+    for (const t of trades) for (const c of (t.confluences || [])) u[c] = (u[c] || 0) + 1;
+    return { usage: u, totalTrades: trades.length };
+  }, [cnf]);
+
   return (
     <div>
       <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
@@ -167,6 +185,7 @@ export default function Confluences() {
       ) : (
         cnf.map(cat => (
           <CategoryBlock key={cat.id} cat={cat}
+            usage={usage} totalTrades={totalTrades}
             onAddItem={addItem} onEditItem={editItem}
             onDeleteItem={deleteItem}
             onEditCatName={editCatName} onDeleteCat={deleteCat}/>

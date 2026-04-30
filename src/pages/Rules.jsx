@@ -1,8 +1,21 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Store } from '../lib/store.js';
 import { Icon, Btn, Empty } from '../components/Shared.jsx';
 
-function RuleItem({ rule, catId, onToggleRequired, onEdit, onDelete }) {
+// Pick a category icon based on the category name. Loose keyword match so the
+// user can rename categories ("Daily Limits" → "Limits") and still get a sane
+// icon. Falls back to a star.
+function iconForCategory(name) {
+  const n = (name || '').toLowerCase();
+  if (n.includes('daily') || n.includes('limit') || n.includes('risk')) return 'shield';
+  if (n.includes('do not') || n.includes("don't") || n.includes('avoid') || n.includes('skip')) return 'x';
+  if (n.includes('entry') || n.includes('check') || n.includes('confluen')) return 'rules';
+  if (n.includes('psych') || n.includes('mind') || n.includes('mood')) return 'sun';
+  if (n.includes('exit') || n.includes('manage')) return 'short';
+  return 'setups';
+}
+
+function RuleItem({ rule, catId, onToggleRequired, onEdit, onDelete, stat }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(rule.text);
 
@@ -38,6 +51,14 @@ function RuleItem({ rule, catId, onToggleRequired, onEdit, onDelete }) {
       ) : (
         <span style={{ flex: 1, fontSize: 13, color: 'var(--text)' }}>{rule.text}</span>
       )}
+      {stat && stat.total > 0 && (
+        <span title={`Followed in ${stat.followed}/${stat.total} rules-scored trades`} style={{
+          fontSize: 10, fontFamily: 'var(--mono)', flexShrink: 0,
+          color: stat.pct >= 80 ? 'var(--bull)' : stat.pct >= 50 ? 'var(--accent)' : 'var(--bear)',
+        }}>
+          {stat.pct}% kept
+        </span>
+      )}
       {!rule.required && (
         <span style={{ fontSize: 10, color: 'var(--text3)', flexShrink: 0 }}>bonus</span>
       )}
@@ -53,7 +74,7 @@ function RuleItem({ rule, catId, onToggleRequired, onEdit, onDelete }) {
   );
 }
 
-function CategoryBlock({ cat, onAddRule, onEditRule, onDeleteRule, onToggleRequired, onEditCatName, onDeleteCat }) {
+function CategoryBlock({ cat, onAddRule, onEditRule, onDeleteRule, onToggleRequired, onEditCatName, onDeleteCat, ruleStats }) {
   const [addingText, setAddingText] = useState('');
   const [editingCat, setEditingCat] = useState(false);
   const [catName, setCatName] = useState(cat.category);
@@ -76,6 +97,14 @@ function CategoryBlock({ cat, onAddRule, onEditRule, onDeleteRule, onToggleRequi
     <div style={{ marginBottom: 28 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
         <div style={{ width: 3, height: 20, background: 'var(--accent)', borderRadius: 2 }}/>
+        <div style={{
+          width: 26, height: 26, borderRadius: 7,
+          background: 'var(--accentDim)', border: '1px solid var(--accentBorder)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'var(--accent)', flexShrink: 0,
+        }}>
+          <Icon name={iconForCategory(cat.category)} size={13}/>
+        </div>
         {editingCat ? (
           <input autoFocus className="form-input" value={catName}
             onChange={e => setCatName(e.target.value)}
@@ -104,6 +133,7 @@ function CategoryBlock({ cat, onAddRule, onEditRule, onDeleteRule, onToggleRequi
       )}
       {cat.rules.map(rule => (
         <RuleItem key={rule.id} rule={rule} catId={cat.id}
+          stat={ruleStats?.[rule.id]}
           onEdit={onEditRule} onDelete={onDeleteRule} onToggleRequired={onToggleRequired}/>
       ))}
 
@@ -151,6 +181,23 @@ export default function Rules() {
   const totalRules = rules.reduce((s, c) => s + c.rules.length, 0);
   const requiredCount = rules.reduce((s, c) => s + c.rules.filter(r => r.required).length, 0);
 
+  // How often each rule was followed across rules-scored trades. Lets the
+  // user see at a glance which rules they actually keep vs which are aspiration.
+  const ruleStats = useMemo(() => {
+    const trades = Store.getTrades().filter(t => (t.rulesScore || 0) > 0);
+    const map = {};
+    rules.forEach(cat => cat.rules.forEach(r => { map[r.id] = { followed: 0, total: trades.length }; }));
+    for (const t of trades) {
+      const checks = t.rulesChecklist || {};
+      for (const id in map) if (checks[id]) map[id].followed++;
+    }
+    for (const id in map) {
+      const s = map[id];
+      s.pct = s.total ? Math.round((s.followed / s.total) * 100) : 0;
+    }
+    return map;
+  }, [rules]);
+
   return (
     <div>
       <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
@@ -192,7 +239,7 @@ export default function Rules() {
         <Empty icon="📋" title="No rules yet" desc="Add your first category below to define your trading rules."/>
       ) : (
         rules.map(cat => (
-          <CategoryBlock key={cat.id} cat={cat}
+          <CategoryBlock key={cat.id} cat={cat} ruleStats={ruleStats}
             onAddRule={addRule} onEditRule={editRule}
             onDeleteRule={deleteRule} onToggleRequired={toggleRequired}
             onEditCatName={editCatName} onDeleteCat={deleteCat}/>

@@ -87,20 +87,26 @@ function TradeCard({ trade, onClick, onDelete, accountFilter, draggable, isDragg
         {screenshotUrl ? (
           <img src={screenshotUrl} alt="chart" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
-          <div style={{ textAlign: 'center', color: 'var(--text3)' }}>
-            <Icon name="image" size={28}/>
-            <div style={{ fontSize: 10, marginTop: 4 }}>No chart</div>
+          <div style={{
+            position: 'absolute', inset: 10,
+            border: '1.5px dashed var(--border2)', borderRadius: 8,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--text3)', gap: 4,
+          }}>
+            <Icon name="image" size={22}/>
+            <div style={{ fontSize: 10, letterSpacing: '0.04em' }}>Drop a screenshot</div>
           </div>
         )}
-        <div style={{ position: 'absolute', top: 8, right: 8 }}><Badge result={result}/></div>
-        <div style={{ position: 'absolute', top: 8, left: 8 }}><DirBadge dir={direction}/></div>
       </div>
 
       <div style={{ padding: '12px 14px', flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text2)' }}>{date}{time && ` · ${time}`}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <DirBadge dir={direction}/>
+          <Badge result={result}/>
+          <span style={{ flex: 1 }}/>
           <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600 }}>{instrument}</span>
         </div>
+        <div style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text3)' }}>{date}{time && ` · ${time}`}</div>
         <div style={{ fontSize: 12, color: 'var(--text2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{entryModel}</div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
           <PnlText value={cardPnl} size={16}/>
@@ -667,7 +673,7 @@ export default function Journal({ rules, settings, openTradeId, onOpenHandled, a
           </div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
           {visible.map(t => (
             <TradeCard
               key={t.id} trade={t} onClick={setSelected} onDelete={handleDelete}

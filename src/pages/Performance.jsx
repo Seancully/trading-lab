@@ -275,9 +275,15 @@ export function CalendarView({ byDay, trades = [], accountFilter = null }) {
     if (weeks.length >= 6) break;
   }
 
-  const monthPnl = Object.entries(byDay)
-    .filter(([d]) => d.startsWith(`${year}-${String(month + 1).padStart(2, '0')}`))
-    .reduce((s, [, v]) => s + v, 0);
+  const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const monthByDay = Object.entries(byDay).filter(([d]) => d.startsWith(monthPrefix));
+  const monthPnl = monthByDay.reduce((s, [, v]) => s + v, 0);
+  const monthTradeCount = trades.filter(t => (t.date || '').startsWith(monthPrefix)).length;
+  const monthWins = trades.filter(t => (t.date || '').startsWith(monthPrefix) && t.result === 'Win').length;
+  const monthLosses = trades.filter(t => (t.date || '').startsWith(monthPrefix) && t.result === 'Loss').length;
+  const monthBestDay = monthByDay.length ? Math.max(...monthByDay.map(([, v]) => v)) : 0;
+  const monthWorstDay = monthByDay.length ? Math.min(...monthByDay.map(([, v]) => v)) : 0;
+  const monthTradedDays = monthByDay.filter(([, v]) => v !== 0).length;
 
   const dayHeaders = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
@@ -294,22 +300,29 @@ export function CalendarView({ byDay, trades = [], accountFilter = null }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+      <div className="card" style={{ padding: '14px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         <button
           onClick={() => setCurrent(c => { const d = new Date(c.year, c.month - 1); return { year: d.getFullYear(), month: d.getMonth() }; })}
           style={{ background: 'none', border: '1px solid var(--border2)', color: 'var(--text2)', cursor: 'pointer', borderRadius: 6, padding: '6px 10px', display: 'flex' }}
         ><Icon name="chevronL" size={14}/></button>
-        <span style={{ fontWeight: 700, fontSize: 15, minWidth: 160, textAlign: 'center' }}>{monthName}</span>
+        <span style={{ fontWeight: 700, fontSize: 15, minWidth: 150, textAlign: 'center' }}>{monthName}</span>
         <button
           onClick={() => setCurrent(c => { const d = new Date(c.year, c.month + 1); return { year: d.getFullYear(), month: d.getMonth() }; })}
           style={{ background: 'none', border: '1px solid var(--border2)', color: 'var(--text2)', cursor: 'pointer', borderRadius: 6, padding: '6px 10px', display: 'flex' }}
         ><Icon name="chevron" size={14}/></button>
         <div style={{ flex: 1 }}/>
-        <span style={{ fontFamily: 'var(--mono)', fontSize: 13 }}>
-          Month total: <span style={{ color: monthPnl > 0 ? 'var(--bull)' : monthPnl < 0 ? 'var(--bear)' : 'var(--text2)', fontWeight: 600 }}>
-            {monthPnl >= 0 ? '+' : ''}${monthPnl.toLocaleString()}
-          </span>
-        </span>
+        {monthTradeCount > 0 ? (
+          <div style={{ display: 'flex', gap: 18, alignItems: 'center', flexWrap: 'wrap', fontSize: 12, fontFamily: 'var(--mono)' }}>
+            <CalHeaderStat label="Total" value={`${monthPnl >= 0 ? '+' : '-'}$${Math.abs(Math.round(monthPnl)).toLocaleString()}`}
+              color={monthPnl > 0 ? 'var(--bull)' : monthPnl < 0 ? 'var(--bear)' : 'var(--text2)'}/>
+            <CalHeaderStat label="Trades" value={`${monthTradeCount}`} sub={`${monthWins}W · ${monthLosses}L`}/>
+            <CalHeaderStat label="Days" value={`${monthTradedDays}`} sub="traded"/>
+            <CalHeaderStat label="Best day" value={`+$${Math.round(monthBestDay).toLocaleString()}`} color="var(--bull)"/>
+            <CalHeaderStat label="Worst day" value={`-$${Math.round(Math.abs(monthWorstDay)).toLocaleString()}`} color="var(--bear)"/>
+          </div>
+        ) : (
+          <span style={{ fontSize: 12, color: 'var(--text3)' }}>No trades this month</span>
+        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4, marginBottom: 4 }}>
@@ -356,7 +369,10 @@ export function CalendarView({ byDay, trades = [], accountFilter = null }) {
                     {pnl > 0 ? '+' : ''}${Math.round(Math.abs(pnl)).toLocaleString()}
                   </div>
                 ) : inMonth ? (
-                  <div style={{ fontSize: 9, color: 'var(--text3)' }}>—</div>
+                  <div title="No trades" style={{
+                    width: 4, height: 4, borderRadius: '50%',
+                    background: 'var(--border2)', opacity: 0.6,
+                  }}/>
                 ) : null}
               </div>
             );
@@ -501,6 +517,15 @@ function EquityCard({ title, subtitle, equity = [], height, empty, totalPnl, max
   );
 }
 
+function CalHeaderStat({ label, value, sub, color }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
+      <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text3)', fontFamily: 'var(--font)' }}>{label}</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: color || 'var(--text)' }}>{value}{sub ? <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text3)', marginLeft: 5, fontFamily: 'var(--font)' }}>{sub}</span> : null}</div>
+    </div>
+  );
+}
+
 // ── Weekly lessons ────────────────────────────────────────────────────────────
 // Local Mon 00:00 → next Mon 00:00. Rolls over Monday morning automatically.
 function startOfThisWeek() {
@@ -533,7 +558,7 @@ function WeeklyLessons({ trades }) {
   }, [trades]);
 
   return (
-    <div className="card">
+    <div className="card" style={{ borderLeft: '3px solid var(--accent)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 8, flexWrap: 'wrap' }}>
         <div className="card-title" style={{ margin: 0 }}>Lessons This Week</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -610,7 +635,7 @@ function MostSkippedRules({ trades }) {
   }, [trades, rulesData]);
 
   return (
-    <div className="card">
+    <div className="card" style={{ borderLeft: '3px solid var(--accent)' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
         <div className="card-title" style={{ margin: 0 }}>Discipline · Most-Skipped Rules</div>
         <div style={{ fontSize: 11, color: 'var(--text3)' }}>
@@ -694,7 +719,8 @@ export default function Performance({ accountFilter }) {
 
       {tab === 'Overview' && (
         <div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
+          <div style={{ marginBottom: 8, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text3)' }}>P&L · Outcome</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginBottom: 18 }}>
             <StatCard label="Total P&L"
               value={<span style={{ color: stats.totalPnl >= 0 ? 'var(--bull)' : 'var(--bear)' }}>{fmtPnl(stats.totalPnl)}</span>}/>
             <StatCard label="Win Rate" value={`${stats.winRate}%`}
@@ -703,6 +729,10 @@ export default function Performance({ accountFilter }) {
               sub={`G.Win $${Math.round(stats.grossWin)} / G.Loss $${Math.round(stats.grossLoss)}`}/>
             <StatCard label="Avg R Won" value={<span style={{ color: 'var(--bull)' }}>+{stats.avgRWin}R</span>}
               sub={`Avg R Lost: ${stats.avgRLoss}R`}/>
+          </div>
+
+          <div style={{ marginBottom: 8, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text3)' }}>Risk · Discipline</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
             <StatCard label="Max Drawdown" value={<span style={{ color: 'var(--bear)' }}>-${Math.round(stats.maxDD)}</span>}/>
             <StatCard label="Best Day" value={<span style={{ color: 'var(--bull)' }}>{fmtPnl(stats.bestDay)}</span>}
               sub={`Worst: ${fmtPnl(stats.worstDay)}`}/>
@@ -714,11 +744,11 @@ export default function Performance({ accountFilter }) {
               </span>}/>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(280px, 1fr)', gap: 16 }} className="perf-equity-models">
             <EquityCard
               title="Equity Curve"
               equity={stats.equity}
-              height={200}
+              height={240}
               totalPnl={stats.totalPnl}
               maxDD={stats.maxDD}
               empty={<div style={{ color: 'var(--text3)', fontSize: 12, padding: 20 }}>Need 2+ trades</div>}
