@@ -6,6 +6,7 @@ import { supabase, supabaseConfigured } from './supabase.js';
 
 const KEYS = {
   trades: 'tl_trades',
+  deletedTrades: 'tl_deleted_trades',
   tradeOrder: 'tl_trade_order',
   rules: 'tl_rules',
   rulesVersion: 'tl_rules_version',
@@ -281,16 +282,48 @@ export const Sync = {
     if (!supabase || !currentUser) return;
     setStatus('syncing');
     try {
-      // Trades
+      // ── Deletion tombstones ──────────────────────────────────────────────
+      // Without these, "delete on device A → sync from device B" resurrects
+      // the trade. The tombstone set is itself synced; we union it with
+      // anything local and respect it on every merge.
+      const remoteDeleted = await this.pull('deleted_trades');
+      const localDeletedRaw = (() => {
+        try { return JSON.parse(localStorage.getItem(KEYS.deletedTrades) || '[]'); }
+        catch { return []; }
+      })();
+      const tombstoneSet = new Set([
+        ...(Array.isArray(remoteDeleted) ? remoteDeleted : []),
+        ...localDeletedRaw,
+      ]);
+      const tombstoneArr = [...tombstoneSet];
+      localStorage.setItem(KEYS.deletedTrades, JSON.stringify(tombstoneArr));
+      if (tombstoneArr.length > (remoteDeleted?.length || 0)) {
+        await this.push('deleted_trades', tombstoneArr);
+      }
+
+      // Trades — skip anything in the tombstone set, and proactively delete
+      // any remote rows that should have been gone.
       const remoteTrades = await this.pullPrefix('trade_');
       if (remoteTrades) {
         const local = Store.getTrades();
-        const remoteMap = Object.fromEntries(remoteTrades.map(r => [r.value.id, r.value]));
-        const localMap  = Object.fromEntries(local.map(t => [t.id, t]));
+        const remoteMap = Object.fromEntries(
+          remoteTrades
+            .filter(r => r.value && !tombstoneSet.has(r.value.id))
+            .map(r => [r.value.id, r.value])
+        );
+        const localMap = Object.fromEntries(
+          local.filter(t => !tombstoneSet.has(t.id)).map(t => [t.id, t])
+        );
         const merged = Object.values({ ...remoteMap, ...localMap });
         localStorage.setItem(KEYS.trades, JSON.stringify(merged));
         for (const t of merged) {
           if (!remoteMap[t.id]) await this.push('trade_' + t.id, t);
+        }
+        // Mop up: any remote row that's now tombstoned still in remote → kill it.
+        for (const r of remoteTrades) {
+          if (r.value && tombstoneSet.has(r.value.id)) {
+            await this.deleteKey('trade_' + r.value.id);
+          }
         }
       }
       // Notes
@@ -423,14 +456,22 @@ export const Store = {
     return this.getTrades().filter(t => this.isSampleTrade(t)).length;
   },
 
-  // Removes sample trades both from localStorage AND from Supabase, so they
-  // don't re-appear on the next sync from another device.
+  // Removes sample trades both from localStorage AND from Supabase, AND
+  // tombstones their ids so they can't be resurrected by a stale sync from
+  // another device that still has them in localStorage.
   async removeSampleTrades() {
     const all = this.getTrades();
     const samples = all.filter(t => this.isSampleTrade(t));
     if (!samples.length) return { removed: 0 };
     const keep = all.filter(t => !this.isSampleTrade(t));
     localStorage.setItem(KEYS.trades, JSON.stringify(keep));
+    // Tombstone in one batch (one push instead of N).
+    const set = this.getDeletedTradeIds();
+    for (const t of samples) set.add(t.id);
+    const arr = [...set];
+    localStorage.setItem(KEYS.deletedTrades, JSON.stringify(arr));
+    Sync.push('deleted_trades', arr);
+    // Then remove individual remote rows.
     for (const t of samples) {
       try { await Sync.deleteKey('trade_' + t.id); } catch { /* noop */ }
     }
@@ -513,10 +554,25 @@ export const Store = {
   deleteTrade(id) {
     const trades = this.getTrades().filter(t => t.id !== id);
     localStorage.setItem(KEYS.trades, JSON.stringify(trades));
+    this._tombstoneTrade(id);
     Sync.deleteKey('trade_' + id);
     return trades;
   },
   clearLocalTrades() { localStorage.removeItem(KEYS.trades); },
+
+  // ── Deletion tombstones ────────────────────────────────────────────────
+  // Records ids of trades that were deleted, so a sync from another device
+  // doesn't resurrect them. The tombstone set is itself synced.
+  getDeletedTradeIds() {
+    return new Set(read(KEYS.deletedTrades, []));
+  },
+  _tombstoneTrade(id) {
+    const set = this.getDeletedTradeIds();
+    set.add(id);
+    const arr = [...set];
+    localStorage.setItem(KEYS.deletedTrades, JSON.stringify(arr));
+    Sync.push('deleted_trades', arr);
+  },
 
   getRules() {
     const version = read(KEYS.rulesVersion, 0);
