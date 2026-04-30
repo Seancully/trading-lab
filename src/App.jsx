@@ -546,7 +546,7 @@ export default function App() {
 
             {user && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 4, paddingLeft: 10, borderLeft: '1px solid var(--border)' }}>
-                <div style={{
+                <div title={user.email} style={{
                   width: 26, height: 26, borderRadius: '50%',
                   background: 'var(--accentDim)', border: '1px solid var(--accentBorder)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -554,9 +554,6 @@ export default function App() {
                 }}>
                   {(user.email || '?')[0].toUpperCase()}
                 </div>
-                <span style={{ fontSize: 11, color: 'var(--text2)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} className="user-email">
-                  {user.email}
-                </span>
                 <button className="icon-btn" onClick={handleSignOut} title="Sign out" style={{ width: 26, height: 26 }}>
                   <Icon name="logout" size={13}/>
                 </button>
