@@ -532,7 +532,7 @@ function WeeklyLessons({ trades }) {
   }, [trades]);
 
   return (
-    <div className="card" style={{ marginTop: 16 }}>
+    <div className="card">
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
         <div className="card-title" style={{ margin: 0 }}>Lessons This Week</div>
         <div style={{ fontSize: 11, color: 'var(--text3)' }}>
@@ -561,6 +561,81 @@ function WeeklyLessons({ trades }) {
                   <span>{fmtLessonDate(t.date)}</span>
                   {t.entryModel && <span>· {t.entryModel}</span>}
                   {t.result && <span style={{ color: resultColor }}>· {t.result}</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Most-skipped rules this week ──────────────────────────────────────────────
+// Counts how many of this week's trades had each rule unchecked. Rules are
+// considered "applicable" only if at least one trade this week explicitly
+// engaged with the checklist (rulesScore > 0) — that way you don't get junk
+// counts from trades logged before the rules feature existed.
+function MostSkippedRules({ trades }) {
+  const rulesData = useMemo(() => Store.getRules() || [], []);
+
+  const skipped = useMemo(() => {
+    const start = localDateStr(startOfThisWeek());
+    const weekTrades = trades.filter(t => (t.date || '') >= start && (t.rulesScore || 0) > 0);
+    if (!weekTrades.length) return { items: [], totalTrades: 0 };
+
+    const allRules = rulesData.flatMap(cat => cat.rules.map(r => ({ ...r, category: cat.category })));
+    const counts = {};
+    for (const r of allRules) counts[r.id] = { rule: r, skipped: 0 };
+    for (const t of weekTrades) {
+      const checks = t.rulesChecklist || {};
+      for (const r of allRules) {
+        if (!checks[r.id]) counts[r.id].skipped++;
+      }
+    }
+    const items = Object.values(counts)
+      .filter(x => x.skipped > 0)
+      .sort((a, b) => b.skipped - a.skipped)
+      .slice(0, 5);
+    return { items, totalTrades: weekTrades.length };
+  }, [trades, rulesData]);
+
+  return (
+    <div className="card">
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div className="card-title" style={{ margin: 0 }}>Discipline · Most-Skipped Rules</div>
+        <div style={{ fontSize: 11, color: 'var(--text3)' }}>
+          {skipped.totalTrades > 0
+            ? `This week · ${skipped.totalTrades} trade${skipped.totalTrades === 1 ? '' : 's'} scored`
+            : 'This week'}
+        </div>
+      </div>
+      {skipped.items.length === 0 ? (
+        <div style={{ color: 'var(--text3)', fontSize: 12, padding: '20px 4px' }}>
+          {skipped.totalTrades === 0
+            ? 'No rules-scored trades this week yet. Tick the checklist when logging to see what you slip on most.'
+            : 'Clean week — every rule on every trade. Keep it going.'}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {skipped.items.map(({ rule, skipped: count }) => {
+            const pct = (count / skipped.totalTrades) * 100;
+            const tone = pct >= 66 ? 'var(--bear)' : pct >= 33 ? 'var(--accent)' : 'var(--text3)';
+            return (
+              <div key={rule.id}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text)', flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 10, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginRight: 6 }}>
+                      {rule.category}
+                    </span>
+                    {rule.text}
+                  </div>
+                  <div style={{ fontSize: 11, color: tone, fontFamily: 'var(--mono)', flexShrink: 0 }}>
+                    {count}/{skipped.totalTrades}
+                  </div>
+                </div>
+                <div style={{ height: 4, background: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ width: `${pct}%`, height: '100%', background: tone, transition: 'width 0.3s ease' }}/>
                 </div>
               </div>
             );
@@ -645,7 +720,10 @@ export default function Performance({ accountFilter }) {
             </div>
           </div>
 
-          <WeeklyLessons trades={trades}/>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16, marginTop: 16 }}>
+            <WeeklyLessons trades={trades}/>
+            <MostSkippedRules trades={trades}/>
+          </div>
         </div>
       )}
 

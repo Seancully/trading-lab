@@ -7,7 +7,6 @@ import {
 } from './components/Shared.jsx';
 import Toaster from './components/Toaster.jsx';
 import AnimatedNumber from './components/AnimatedNumber.jsx';
-import Sparkline from './components/Sparkline.jsx';
 import CommandPalette from './components/CommandPalette.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import Login from './pages/Login.jsx';
@@ -195,11 +194,6 @@ function Dashboard({ onNav, accountFilter }) {
               sparkData: stats.series?.rules },
           ].map(s => (
             <div key={s.label} className="stat-card">
-              {s.sparkData && s.sparkData.length >= 2 && (
-                <div className="stat-spark">
-                  <Sparkline data={s.sparkData} width={60} height={20} stroke={s.color} />
-                </div>
-              )}
               <div className="stat-label">{s.label}</div>
               <div className="stat-num" style={{ color: s.color || 'var(--text)' }}>
                 {s.raw ?? (s.num == null ? '—' : <AnimatedNumber value={s.num} format={s.fmt}/>)}

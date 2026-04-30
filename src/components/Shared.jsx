@@ -27,6 +27,8 @@ export function Icon({ name, size = 16 }) {
     search:    <><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.5" fill="none"/><path d="M21 21l-4.3-4.3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></>,
     expand:    <path d="M9 3H3v6M15 3h6v6M21 15v6h-6M3 15v6h6" strokeWidth="1.5" stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round"/>,
     shrink:    <path d="M9 3v6H3M21 9h-6V3M15 21v-6h6M3 15h6v6" strokeWidth="1.5" stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round"/>,
+    filter:    <path d="M3 5h18M6 12h12M10 19h4" strokeWidth="1.5" stroke="currentColor" fill="none" strokeLinecap="round"/>,
+    shield:    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeWidth="1.5" stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round"/>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" style={{ display:'inline-block', flexShrink:0 }}>

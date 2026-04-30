@@ -7,6 +7,39 @@ import {
 } from '../components/Shared.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 
+function FilterChipGroup({ label, options, selected, onToggle }) {
+  if (!options.length) return null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '8px 0', borderBottom: '1px dashed var(--border)' }}>
+      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text3)', minWidth: 88, paddingTop: 6 }}>
+        {label}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, flex: 1 }}>
+        {options.map(opt => {
+          const active = selected.includes(opt);
+          return (
+            <button
+              key={opt}
+              onClick={() => onToggle(opt)}
+              className="chip"
+              style={{
+                cursor: 'pointer',
+                fontFamily: 'var(--font)',
+                color: active ? 'var(--accent)' : 'var(--text2)',
+                borderColor: active ? 'var(--accentBorder)' : 'var(--border)',
+                background: active ? 'var(--accentDim)' : 'transparent',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 const ENTRY_MODELS = [
   'HTF PDA → IFVG', 'Internal → External (Sweep Short)', 'Internal → External (Sweep Long)',
   'Internal → External (Break Long)', 'Internal → External (Break Short)',
@@ -446,6 +479,39 @@ export default function Journal({ rules, settings, openTradeId, onOpenHandled, a
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState(() => Store.getTradeOrder() ? 'manual' : 'newest');
+  const [showFilters, setShowFilters] = useState(false);
+  const [setupFilter, setSetupFilter] = useState([]);
+  const [sessionFilter, setSessionFilter] = useState([]);
+  const [instrumentFilter, setInstrumentFilter] = useState([]);
+  const [confluenceFilter, setConfluenceFilter] = useState([]);
+
+  const toggleFromArray = (arr, setArr, val) => {
+    setArr(arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val]);
+  };
+  const clearAllFilters = () => {
+    setSetupFilter([]); setSessionFilter([]); setInstrumentFilter([]); setConfluenceFilter([]);
+  };
+
+  // Distinct option lists pulled from logged trades. Sorted alphabetically so
+  // the chip rows stay stable as new trades are added.
+  const filterOptions = useMemo(() => {
+    const setups = new Set(), sessions = new Set(), instruments = new Set(), confluences = new Set();
+    for (const t of trades) {
+      if (t.entryModel) setups.add(t.entryModel);
+      if (t.session) sessions.add(t.session);
+      if (t.instrument) instruments.add(t.instrument);
+      (t.confluences || []).forEach(c => confluences.add(c));
+    }
+    const sortArr = (s) => [...s].sort((a, b) => a.localeCompare(b));
+    return {
+      setups: sortArr(setups),
+      sessions: sortArr(sessions),
+      instruments: sortArr(instruments),
+      confluences: sortArr(confluences),
+    };
+  }, [trades]);
+
+  const activeFilterCount = setupFilter.length + sessionFilter.length + instrumentFilter.length + confluenceFilter.length;
   const [draggingId, setDraggingId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
 
@@ -479,6 +545,12 @@ export default function Journal({ rules, settings, openTradeId, onOpenHandled, a
     else visible = visible.filter(t => t.accounts?.some(a => accountFilter.includes(a.name)));
   }
   if (filter !== 'All') visible = visible.filter(t => t.result === filter);
+  if (setupFilter.length) visible = visible.filter(t => setupFilter.includes(t.entryModel));
+  if (sessionFilter.length) visible = visible.filter(t => sessionFilter.includes(t.session));
+  if (instrumentFilter.length) visible = visible.filter(t => instrumentFilter.includes(t.instrument));
+  if (confluenceFilter.length) visible = visible.filter(t =>
+    (t.confluences || []).some(c => confluenceFilter.includes(c))
+  );
   if (search) {
     const q = search.toLowerCase();
     visible = visible.filter(t =>
@@ -534,7 +606,7 @@ export default function Journal({ rules, settings, openTradeId, onOpenHandled, a
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 20, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
         <Tabs tabs={['All', 'Win', 'Loss', 'BE']} active={filter} onChange={setFilter}/>
         <input className="form-input" style={{ width: 200, marginBottom: 0 }} placeholder="Search trades..."
           value={search} onChange={e => setSearch(e.target.value)}/>
@@ -545,12 +617,32 @@ export default function Journal({ rules, settings, openTradeId, onOpenHandled, a
           <option value="pnl-lo">P&L ↓</option>
           <option value="manual">Manual order</option>
         </select>
+        <Btn variant={showFilters || activeFilterCount > 0 ? 'primary' : 'ghost'} onClick={() => setShowFilters(s => !s)}>
+          <Icon name="filter" size={13}/>
+          Filters{activeFilterCount > 0 ? ` · ${activeFilterCount}` : ''}
+        </Btn>
         <div style={{ flex: 1 }}/>
         <div style={{ fontSize: 12, color: 'var(--text3)' }}>{visible.length} trade{visible.length !== 1 ? 's' : ''}</div>
         <Btn variant="primary" onClick={() => setAdding(true)}>
           <Icon name="plus" size={14}/> New Trade
         </Btn>
       </div>
+
+      {showFilters && (
+        <div className="card" style={{ padding: '14px 16px', marginBottom: 16 }}>
+          <FilterChipGroup label="Setup"      options={filterOptions.setups}       selected={setupFilter}      onToggle={(v) => toggleFromArray(setupFilter, setSetupFilter, v)}/>
+          <FilterChipGroup label="Session"    options={filterOptions.sessions}      selected={sessionFilter}    onToggle={(v) => toggleFromArray(sessionFilter, setSessionFilter, v)}/>
+          <FilterChipGroup label="Instrument" options={filterOptions.instruments}   selected={instrumentFilter} onToggle={(v) => toggleFromArray(instrumentFilter, setInstrumentFilter, v)}/>
+          <FilterChipGroup label="Confluence" options={filterOptions.confluences}   selected={confluenceFilter} onToggle={(v) => toggleFromArray(confluenceFilter, setConfluenceFilter, v)}/>
+          {activeFilterCount > 0 && (
+            <div style={{ marginTop: 6, display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={clearAllFilters} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)', padding: 0 }}>
+                Clear all
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {visible.length === 0 ? (
         <div className="empty-state">
