@@ -162,6 +162,28 @@ button, input, select, textarea { font-family: inherit; }
   .modal [style*="grid-template-columns"][style*="minmax(240px"] { grid-template-columns: 1fr !important; }
 }
 
+@media (max-width: 1480px) {
+  /* Give the nav items their own row on laptop widths. */
+  .topnav {
+    height: auto; padding: 0;
+    flex-direction: column; align-items: stretch;
+  }
+  .topnav-row {
+    display: flex; align-items: center;
+    width: 100%; padding: 8px 16px; gap: 8px;
+  }
+  .topnav-row.row-top { border-bottom: 1px solid var(--border); }
+  .topnav-logo {
+    padding-right: 0; margin-right: 0;
+    border-right: none; flex-shrink: 0;
+  }
+  .topnav-items {
+    height: 44px;
+    padding: 0 10px;
+    width: 100%;
+  }
+}
+
 @media (max-width: 720px) {
   /* Stack the topnav into two rows so the nav items always have full width
      to scroll across, instead of being squeezed to zero by the actions. */
