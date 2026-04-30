@@ -28,7 +28,7 @@ function TradeCard({ trade, onClick, onDelete, accountFilter, draggable, isDragg
 
   const handleDelete = (e) => {
     e.stopPropagation();
-    if (window.confirm(`Delete trade from ${date}?`)) onDelete(trade.id);
+    if (window.confirm(`Delete trade from ${date}?`)) onDelete(trade.id || trade);
   };
 
   return (

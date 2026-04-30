@@ -301,25 +301,31 @@ export const Sync = {
         await this.push('deleted_trades', tombstoneArr);
       }
 
-      // Trades — skip anything in the tombstone set, and proactively delete
-      // any remote rows that should have been gone.
+      // Trades — drop orphans (missing id), skip tombstoned, then merge.
       const remoteTrades = await this.pullPrefix('trade_');
       if (remoteTrades) {
+        // Garbage-collect remote rows that are corrupt (no id, or value with
+        // no id field) — they can't be tombstoned by id and would resurrect.
+        for (const r of remoteTrades) {
+          if (!r.value || !r.value.id) {
+            await this.deleteKey(r.key);
+          }
+        }
         const local = Store.getTrades();
         const remoteMap = Object.fromEntries(
           remoteTrades
-            .filter(r => r.value && !tombstoneSet.has(r.value.id))
+            .filter(r => r.value && r.value.id && !tombstoneSet.has(r.value.id))
             .map(r => [r.value.id, r.value])
         );
         const localMap = Object.fromEntries(
-          local.filter(t => !tombstoneSet.has(t.id)).map(t => [t.id, t])
+          local.filter(t => t.id && !tombstoneSet.has(t.id)).map(t => [t.id, t])
         );
         const merged = Object.values({ ...remoteMap, ...localMap });
         localStorage.setItem(KEYS.trades, JSON.stringify(merged));
         for (const t of merged) {
           if (!remoteMap[t.id]) await this.push('trade_' + t.id, t);
         }
-        // Mop up: any remote row that's now tombstoned still in remote → kill it.
+        // Mop up: any remote row that's tombstoned but still in remote → kill it.
         for (const r of remoteTrades) {
           if (r.value && tombstoneSet.has(r.value.id)) {
             await this.deleteKey('trade_' + r.value.id);
@@ -422,7 +428,24 @@ export const Store = {
   uid,
 
   getTrades() {
-    return read(KEYS.trades, []);
+    // Normalize on read: every trade must have an id (older / corrupted
+    // records sometimes arrive without one, which silently breaks deletion
+    // because the tombstone set ends up keyed on `undefined`). Mutated
+    // results are persisted so the next read is stable.
+    const raw = read(KEYS.trades, []);
+    let mutated = false;
+    const out = [];
+    for (const t of raw) {
+      if (!t || typeof t !== 'object') { mutated = true; continue; }
+      if (!t.id) {
+        mutated = true;
+        out.push({ ...t, id: uid() });
+      } else {
+        out.push(t);
+      }
+    }
+    if (mutated) localStorage.setItem(KEYS.trades, JSON.stringify(out));
+    return out;
   },
   loadSampleTrades() {
     const s = makeSample();
@@ -551,12 +574,28 @@ export const Store = {
     Sync.push('trade_' + trade.id, trade);
     return trades;
   },
-  deleteTrade(id) {
-    const trades = this.getTrades().filter(t => t.id !== id);
-    localStorage.setItem(KEYS.trades, JSON.stringify(trades));
-    this._tombstoneTrade(id);
-    Sync.deleteKey('trade_' + id);
-    return trades;
+  deleteTrade(idOrTrade) {
+    // Accepts a trade id (string) or a full trade object. The object form is
+    // a safety net for corrupt records whose id field went missing — we look
+    // them up by structural equality and the normalized id assigned at read.
+    const all = this.getTrades(); // normalized — every trade has an id
+    let id = typeof idOrTrade === 'string' ? idOrTrade : idOrTrade?.id;
+    if (!id && idOrTrade && typeof idOrTrade === 'object') {
+      const found = all.find(t =>
+        t.date === idOrTrade.date &&
+        t.time === idOrTrade.time &&
+        t.pnlDollars === idOrTrade.pnlDollars &&
+        t.entryModel === idOrTrade.entryModel
+      );
+      id = found?.id;
+    }
+    const next = id ? all.filter(t => t.id !== id) : all;
+    localStorage.setItem(KEYS.trades, JSON.stringify(next));
+    if (id) {
+      this._tombstoneTrade(id);
+      Sync.deleteKey('trade_' + id);
+    }
+    return next;
   },
   clearLocalTrades() { localStorage.removeItem(KEYS.trades); },
 
