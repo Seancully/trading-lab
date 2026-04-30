@@ -163,25 +163,6 @@ function Dashboard({ onNav, accountFilter }) {
   return (
     <div>
       <div className="welcome-bar">
-        {stats && stats.equity.length >= 2 && (() => {
-          const values = stats.equity.map(e => e.value);
-          const min = Math.min(...values, 0);
-          const max = Math.max(...values, 0);
-          const range = (max - min) || 1;
-          const W = 100, H = 36;
-          const pts = values.map((v, i) => {
-            const x = (i / (values.length - 1)) * W;
-            const y = H - ((v - min) / range) * H;
-            return `${x.toFixed(2)},${y.toFixed(2)}`;
-          }).join(' ');
-          const last = values[values.length - 1];
-          const stroke = last >= 0 ? 'var(--bullStroke)' : 'var(--bearStroke)';
-          return (
-            <svg className="welcome-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden>
-              <polyline points={pts} fill="none" stroke={stroke} strokeWidth="0.8" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke"/>
-            </svg>
-          );
-        })()}
         <div>
           <div style={{ fontSize: 18, fontWeight: 700 }}>{greet} 👋</div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>

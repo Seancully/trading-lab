@@ -81,8 +81,17 @@ button, input, select, textarea { font-family: inherit; }
 /* ── Top Nav ────────────────────────────────────────────────────────────── */
 .topnav {
   height: var(--nav-h); flex-shrink: 0;
-  background: var(--bg2); border-bottom: 1px solid var(--border);
+  background:
+    radial-gradient(80% 200% at 100% 0%, var(--accentDim) 0%, transparent 60%),
+    linear-gradient(180deg, var(--bg2) 0%, var(--bg) 100%);
+  border-bottom: 1px solid var(--border);
   display: flex; align-items: center; padding: 0 24px; gap: 0; z-index: 20;
+  position: relative;
+}
+.topnav::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
+  background: linear-gradient(90deg, transparent 0%, var(--accentBorder) 50%, transparent 100%);
+  opacity: 0.4; pointer-events: none;
 }
 .topnav-row { display: contents; }
 .topnav-logo {
@@ -100,35 +109,42 @@ button, input, select, textarea { font-family: inherit; }
 }
 .topnav-logo p { font-size: 9px; color: var(--text3); letter-spacing: 0.06em; }
 
-.topnav-items { display: flex; align-items: stretch; height: 100%; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; }
+.topnav-items {
+  display: flex; align-items: center; height: 100%;
+  overflow-x: auto; scrollbar-width: none;
+  flex: 1; min-width: 0;
+  padding-left: 14px; margin-left: 14px;
+  border-left: 1px solid var(--border);
+  gap: 2px;
+}
 .topnav-items::-webkit-scrollbar { display: none; }
 
 .nav-item {
-  display: flex; align-items: center; gap: 6px;
-  padding: 0 14px; height: 100%;
+  display: flex; align-items: center; gap: 7px;
+  padding: 7px 12px;
   font-size: 13px; font-weight: 500; color: var(--text2);
-  cursor: pointer; border: none; background: none;
-  font-family: var(--font); transition: color 0.15s;
+  cursor: pointer; border: 1px solid transparent; background: transparent;
+  font-family: var(--font);
+  transition: color 0.15s, background 0.15s, border-color 0.15s, transform 0.15s;
   position: relative; white-space: nowrap; letter-spacing: 0.01em;
+  border-radius: 8px;
 }
-.nav-item svg { opacity: 0.7; }
-.nav-item:hover { color: var(--text); }
+.nav-item svg { opacity: 0.65; transition: opacity 0.15s; }
+.nav-item:hover {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--border);
+}
 .nav-item:hover svg { opacity: 1; }
-.nav-item.active { color: var(--text); }
+.nav-item.active {
+  color: var(--accent);
+  background: var(--accentDim);
+  border-color: var(--accentBorder);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 4px 12px -4px var(--accentDim);
+}
 .nav-item.active svg { opacity: 1; }
-.nav-item.active::after {
-  content: ''; position: absolute; bottom: 0;
-  left: 10px; right: 10px; height: 2px;
-  background: var(--accent); border-radius: 2px 2px 0 0;
-  box-shadow: 0 0 12px var(--accent);
-}
-.nav-item.active::before {
-  content: ''; position: absolute; inset: 8px 6px 8px;
-  background: var(--accentDim); border-radius: 6px;
-  z-index: -1; opacity: 0;
-  transition: opacity 0.2s;
-}
-.nav-item.active::before { opacity: 1; }
 .topnav-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .icon-btn {
   width: 30px; height: 30px; border-radius: 7px;
@@ -187,6 +203,8 @@ button, input, select, textarea { font-family: inherit; }
     height: 44px;
     padding: 0 10px;
     width: 100%;
+    margin-left: 0;
+    border-left: none;
   }
 }
 
@@ -211,8 +229,10 @@ button, input, select, textarea { font-family: inherit; }
     height: 44px;
     padding: 0 6px;
     width: 100%;
+    margin-left: 0;
+    border-left: none;
   }
-  .nav-item { padding: 0 12px; font-size: 12px; }
+  .nav-item { padding: 6px 10px; font-size: 12px; }
   .nav-item span.label { display: none; }
   /* Compact action buttons (inline styles need !important to override) */
   .topnav-actions .palette-trigger { display: none !important; }   /* no ⌘K on touch */
@@ -596,18 +616,12 @@ body.light .form-select option { background: #ffffff; color: #0A0A0C; }
   pointer-events: none;
 }
 .welcome-bar > * { position: relative; z-index: 1; }
-.welcome-spark {
-  position: absolute; right: 0; bottom: 0; left: 0;
-  height: 36px; pointer-events: none; opacity: 0.35;
-  z-index: 0;
-}
 [data-theme="light"] .welcome-bar {
   background:
     radial-gradient(120% 140% at 0% 0%, var(--accentDim) 0%, transparent 55%),
     linear-gradient(135deg, var(--surface) 0%, var(--bg2) 100%);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 16px -8px rgba(15, 23, 42, 0.14);
 }
-[data-theme="light"] .welcome-spark { opacity: 0.5; }
 
 /* ── Animations ─────────────────────────────────────────────────────────── */
 @keyframes fadeUp {
