@@ -7,6 +7,7 @@ import { supabase, supabaseConfigured } from './supabase.js';
 const KEYS = {
   trades: 'tl_trades',
   deletedTrades: 'tl_deleted_trades',
+  deletedTradeFps: 'tl_deleted_trade_fps',
   tradeOrder: 'tl_trade_order',
   rules: 'tl_rules',
   rulesVersion: 'tl_rules_version',
@@ -20,6 +21,21 @@ const KEYS = {
 
 export function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
+
+// Stable fingerprint for cross-device deletion. The same logical trade
+// (same date/time/model/pnl/direction) on two devices may have different
+// random ids — tombstoning by id alone won't propagate. Fingerprint matching
+// fills that gap.
+export function tradeFingerprint(t) {
+  if (!t) return '';
+  return [
+    t.date || '',
+    t.time || '',
+    t.entryModel || '',
+    Number(t.pnlDollars) || 0,
+    t.direction || '',
+  ].join('|');
 }
 
 // Per-trade P&L weighted by selected accounts.
@@ -282,23 +298,34 @@ export const Sync = {
     if (!supabase || !currentUser) return;
     setStatus('syncing');
     try {
-      // ── Deletion tombstones ──────────────────────────────────────────────
+      // ── Deletion tombstones (id + fingerprint) ───────────────────────────
       // Without these, "delete on device A → sync from device B" resurrects
-      // the trade. The tombstone set is itself synced; we union it with
-      // anything local and respect it on every merge.
+      // the trade. Two layers: tombstone by id (cheap), and by fingerprint
+      // (date|time|model|pnl|direction) — the fingerprint catches the case
+      // where the same logical record on two devices ended up with different
+      // random ids after read-time normalization.
+      const readArr = (k) => { try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch { return []; } };
       const remoteDeleted = await this.pull('deleted_trades');
-      const localDeletedRaw = (() => {
-        try { return JSON.parse(localStorage.getItem(KEYS.deletedTrades) || '[]'); }
-        catch { return []; }
-      })();
+      const remoteDeletedFps = await this.pull('deleted_trade_fps');
+      const localDeletedRaw = readArr(KEYS.deletedTrades);
+      const localDeletedFpsRaw = readArr(KEYS.deletedTradeFps);
       const tombstoneSet = new Set([
         ...(Array.isArray(remoteDeleted) ? remoteDeleted : []),
         ...localDeletedRaw,
       ]);
+      const fpSet = new Set([
+        ...(Array.isArray(remoteDeletedFps) ? remoteDeletedFps : []),
+        ...localDeletedFpsRaw,
+      ]);
       const tombstoneArr = [...tombstoneSet];
+      const fpArr = [...fpSet];
       localStorage.setItem(KEYS.deletedTrades, JSON.stringify(tombstoneArr));
+      localStorage.setItem(KEYS.deletedTradeFps, JSON.stringify(fpArr));
       if (tombstoneArr.length > (remoteDeleted?.length || 0)) {
         await this.push('deleted_trades', tombstoneArr);
+      }
+      if (fpArr.length > (remoteDeletedFps?.length || 0)) {
+        await this.push('deleted_trade_fps', fpArr);
       }
 
       // Trades — drop orphans (missing id), skip tombstoned, then merge.
@@ -314,21 +341,30 @@ export const Sync = {
         const local = Store.getTrades();
         const remoteMap = Object.fromEntries(
           remoteTrades
-            .filter(r => r.value && r.value.id && !tombstoneSet.has(r.value.id))
+            .filter(r => r.value && r.value.id
+              && !tombstoneSet.has(r.value.id)
+              && !fpSet.has(tradeFingerprint(r.value)))
             .map(r => [r.value.id, r.value])
         );
         const localMap = Object.fromEntries(
-          local.filter(t => t.id && !tombstoneSet.has(t.id)).map(t => [t.id, t])
+          local.filter(t => t.id
+              && !tombstoneSet.has(t.id)
+              && !fpSet.has(tradeFingerprint(t)))
+            .map(t => [t.id, t])
         );
         const merged = Object.values({ ...remoteMap, ...localMap });
         localStorage.setItem(KEYS.trades, JSON.stringify(merged));
         for (const t of merged) {
           if (!remoteMap[t.id]) await this.push('trade_' + t.id, t);
         }
-        // Mop up: any remote row that's tombstoned but still in remote → kill it.
+        // Mop up: any remote row that's tombstoned (by id or fingerprint)
+        // still in remote → kill it.
         for (const r of remoteTrades) {
-          if (r.value && tombstoneSet.has(r.value.id)) {
-            await this.deleteKey('trade_' + r.value.id);
+          if (!r.value) continue;
+          const matchesId = r.value.id && tombstoneSet.has(r.value.id);
+          const matchesFp = fpSet.has(tradeFingerprint(r.value));
+          if (matchesId || matchesFp) {
+            await this.deleteKey(r.key);
           }
         }
       }
@@ -428,15 +464,26 @@ export const Store = {
   uid,
 
   getTrades() {
-    // Normalize on read: every trade must have an id (older / corrupted
-    // records sometimes arrive without one, which silently breaks deletion
-    // because the tombstone set ends up keyed on `undefined`). Mutated
-    // results are persisted so the next read is stable.
+    // Normalize on read:
+    //  1. every trade must have an id (older / corrupted records sometimes
+    //     arrive without one, which silently breaks deletion because the
+    //     tombstone set ends up keyed on `undefined`).
+    //  2. drop husks — entries with no pnl, no R, and no result. These are
+    //     accidental empty-form saves that have nothing useful to journal.
+    //  3. drop anything tombstoned by id or fingerprint.
     const raw = read(KEYS.trades, []);
+    const fps = this.getDeletedFingerprints?.() ?? new Set();
+    const ids = this.getDeletedTradeIds?.() ?? new Set();
     let mutated = false;
     const out = [];
     for (const t of raw) {
       if (!t || typeof t !== 'object') { mutated = true; continue; }
+      const pnl = Number(t.pnlDollars) || 0;
+      const r = Number(t.rMultiple) || 0;
+      const hasResult = t.result === 'Win' || t.result === 'Loss' || t.result === 'BE';
+      const hasContent = pnl !== 0 || r !== 0 || (hasResult && t.date);
+      if (!hasContent) { mutated = true; continue; } // husk
+      if (ids.has(t.id) || fps.has(tradeFingerprint(t))) { mutated = true; continue; }
       if (!t.id) {
         mutated = true;
         out.push({ ...t, id: uid() });
@@ -488,12 +535,21 @@ export const Store = {
     if (!samples.length) return { removed: 0 };
     const keep = all.filter(t => !this.isSampleTrade(t));
     localStorage.setItem(KEYS.trades, JSON.stringify(keep));
-    // Tombstone in one batch (one push instead of N).
-    const set = this.getDeletedTradeIds();
-    for (const t of samples) set.add(t.id);
-    const arr = [...set];
-    localStorage.setItem(KEYS.deletedTrades, JSON.stringify(arr));
-    Sync.push('deleted_trades', arr);
+    // Tombstone in one batch (one push instead of N) — both ids and
+    // fingerprints, so other devices with stale local copies under
+    // different ids still match.
+    const idSet = this.getDeletedTradeIds();
+    const fpSet = this.getDeletedFingerprints();
+    for (const t of samples) {
+      if (t.id) idSet.add(t.id);
+      fpSet.add(tradeFingerprint(t));
+    }
+    const idArr = [...idSet];
+    const fpArr = [...fpSet];
+    localStorage.setItem(KEYS.deletedTrades, JSON.stringify(idArr));
+    localStorage.setItem(KEYS.deletedTradeFps, JSON.stringify(fpArr));
+    Sync.push('deleted_trades', idArr);
+    Sync.push('deleted_trade_fps', fpArr);
     // Then remove individual remote rows.
     for (const t of samples) {
       try { await Sync.deleteKey('trade_' + t.id); } catch { /* noop */ }
@@ -575,42 +631,58 @@ export const Store = {
     return trades;
   },
   deleteTrade(idOrTrade) {
-    // Accepts a trade id (string) or a full trade object. The object form is
-    // a safety net for corrupt records whose id field went missing — we look
-    // them up by structural equality and the normalized id assigned at read.
+    // Accepts a trade id (string) or a full trade object. The object form
+    // gives us a fingerprint to tombstone, which makes the deletion stick
+    // across devices even when each one has its own id for the same record.
     const all = this.getTrades(); // normalized — every trade has an id
     let id = typeof idOrTrade === 'string' ? idOrTrade : idOrTrade?.id;
-    if (!id && idOrTrade && typeof idOrTrade === 'object') {
+    let target = typeof idOrTrade === 'object' ? idOrTrade : null;
+    if (!id && target) {
       const found = all.find(t =>
-        t.date === idOrTrade.date &&
-        t.time === idOrTrade.time &&
-        t.pnlDollars === idOrTrade.pnlDollars &&
-        t.entryModel === idOrTrade.entryModel
+        t.date === target.date &&
+        t.time === target.time &&
+        t.pnlDollars === target.pnlDollars &&
+        t.entryModel === target.entryModel
       );
       id = found?.id;
+      target = found || target;
+    } else if (id && !target) {
+      target = all.find(t => t.id === id) || null;
     }
     const next = id ? all.filter(t => t.id !== id) : all;
     localStorage.setItem(KEYS.trades, JSON.stringify(next));
-    if (id) {
-      this._tombstoneTrade(id);
-      Sync.deleteKey('trade_' + id);
-    }
+    const fp = target ? tradeFingerprint(target) : null;
+    this._tombstoneTrade(id, fp);
+    if (id) Sync.deleteKey('trade_' + id);
     return next;
   },
   clearLocalTrades() { localStorage.removeItem(KEYS.trades); },
 
   // ── Deletion tombstones ────────────────────────────────────────────────
-  // Records ids of trades that were deleted, so a sync from another device
-  // doesn't resurrect them. The tombstone set is itself synced.
+  // Two layers — by id (cheap) AND by fingerprint (cross-device): when the
+  // same logical trade exists on two devices with different ids, an id-only
+  // tombstone misses on the second device. Fingerprint is the fallback.
   getDeletedTradeIds() {
     return new Set(read(KEYS.deletedTrades, []));
   },
-  _tombstoneTrade(id) {
-    const set = this.getDeletedTradeIds();
-    set.add(id);
-    const arr = [...set];
-    localStorage.setItem(KEYS.deletedTrades, JSON.stringify(arr));
-    Sync.push('deleted_trades', arr);
+  getDeletedFingerprints() {
+    return new Set(read(KEYS.deletedTradeFps, []));
+  },
+  _tombstoneTrade(id, fingerprint) {
+    if (id) {
+      const set = this.getDeletedTradeIds();
+      set.add(id);
+      const arr = [...set];
+      localStorage.setItem(KEYS.deletedTrades, JSON.stringify(arr));
+      Sync.push('deleted_trades', arr);
+    }
+    if (fingerprint) {
+      const fps = this.getDeletedFingerprints();
+      fps.add(fingerprint);
+      const arr = [...fps];
+      localStorage.setItem(KEYS.deletedTradeFps, JSON.stringify(arr));
+      Sync.push('deleted_trade_fps', arr);
+    }
   },
 
   getRules() {
