@@ -815,30 +815,50 @@ export default function Performance({ accountFilter }) {
 
       {tab === 'Overview' && (
         <div>
+          {/* Helper — generates a glow rgba for a value */}
+          {(() => null)()}
           <div style={{ marginBottom: 8, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text3)' }}>P&L · Outcome</div>
-          {/* Green glow behind the whole P&L row — colour comes through the glass */}
-          <div className="card-glow-wrap" style={{ '--card-glow': stats.totalPnl >= 0 ? 'rgba(34,197,94,0.36)' : 'rgba(244,63,94,0.36)', marginBottom: 18 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginBottom: 18 }}>
+            {/* Total P&L — green if positive, red if negative */}
+            <div className="card-glow-wrap" style={{ '--card-glow': stats.totalPnl >= 0 ? 'rgba(34,197,94,0.40)' : 'rgba(244,63,94,0.40)' }}>
               <StatCard label="Total P&L"
                 value={<span style={{ color: stats.totalPnl >= 0 ? 'var(--bull)' : 'var(--bear)' }}>{fmtPnl(stats.totalPnl)}</span>}/>
+            </div>
+            {/* Win rate — green if ≥50, red if <50 */}
+            <div className="card-glow-wrap" style={{ '--card-glow': parseFloat(stats.winRate) >= 50 ? 'rgba(34,197,94,0.32)' : 'rgba(244,63,94,0.32)' }}>
               <StatCard label="Win Rate" value={`${stats.winRate}%`}
                 sub={`${stats.wins}W · ${stats.losses}L · ${stats.bes}BE`}/>
+            </div>
+            {/* Profit factor — green if >1, red if <1 */}
+            <div className="card-glow-wrap" style={{ '--card-glow': parseFloat(stats.profitFactor) >= 1 ? 'rgba(34,197,94,0.32)' : 'rgba(244,63,94,0.32)' }}>
               <StatCard label="Profit Factor" value={stats.profitFactor}
                 sub={`G.Win $${Math.round(stats.grossWin)} / G.Loss $${Math.round(stats.grossLoss)}`}/>
+            </div>
+            {/* Avg R Won — always green */}
+            <div className="card-glow-wrap" style={{ '--card-glow': 'rgba(34,197,94,0.32)' }}>
               <StatCard label="Avg R Won" value={<span style={{ color: 'var(--bull)' }}>+{stats.avgRWin}R</span>}
                 sub={`Avg R Lost: ${stats.avgRLoss}R`}/>
             </div>
           </div>
 
           <div style={{ marginBottom: 8, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text3)' }}>Risk · Discipline</div>
-          {/* Red/green glow behind discipline row */}
-          <div className="card-glow-wrap" style={{ '--card-glow': 'rgba(244,63,94,0.28)', marginBottom: 20 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
+            {/* Max drawdown — always red */}
+            <div className="card-glow-wrap" style={{ '--card-glow': 'rgba(244,63,94,0.34)' }}>
               <StatCard label="Max Drawdown" value={<span style={{ color: 'var(--bear)' }}>-${Math.round(stats.maxDD)}</span>}/>
+            </div>
+            {/* Best day — always green */}
+            <div className="card-glow-wrap" style={{ '--card-glow': 'rgba(34,197,94,0.34)' }}>
               <StatCard label="Best Day" value={<span style={{ color: 'var(--bull)' }}>{fmtPnl(stats.bestDay)}</span>}
                 sub={`Worst: ${fmtPnl(stats.worstDay)}`}/>
+            </div>
+            {/* Rules score — colour matches threshold */}
+            <div className="card-glow-wrap" style={{ '--card-glow': stats.avgRulesScore >= 80 ? 'rgba(34,197,94,0.32)' : stats.avgRulesScore >= 60 ? 'rgba(122,162,247,0.32)' : 'rgba(244,63,94,0.32)' }}>
               <StatCard label="Rules Score" value={stats.avgRulesScore !== null ? `${stats.avgRulesScore}%` : '—'}
                 color={stats.avgRulesScore >= 80 ? 'var(--bull)' : stats.avgRulesScore >= 60 ? 'var(--accent)' : 'var(--bear)'}/>
+            </div>
+            {/* Current streak — green/red/neutral by streak type */}
+            <div className="card-glow-wrap" style={{ '--card-glow': stats.streakType === 'Win' ? 'rgba(34,197,94,0.32)' : stats.streakType === 'Loss' ? 'rgba(244,63,94,0.32)' : 'rgba(148,163,184,0.16)' }}>
               <StatCard label="Current Streak"
                 value={<span style={{ color: stats.streakType === 'Win' ? 'var(--bull)' : stats.streakType === 'Loss' ? 'var(--bear)' : 'var(--be)' }}>
                   {stats.streak} {stats.streakType}

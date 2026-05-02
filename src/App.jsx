@@ -229,20 +229,31 @@ function Dashboard({ onNav, accountFilter }) {
               color: stats.avgRulesScore >= 80 ? 'var(--bull)' : stats.avgRulesScore >= 60 ? 'var(--accent)' : 'var(--bear)',
               bar: stats.avgRulesScore / 100,
               barColor: stats.avgRulesScore >= 80 ? 'var(--bull)' : stats.avgRulesScore >= 60 ? 'var(--accent)' : 'var(--bear)' },
-          ].map(s => (
-            <div key={s.label} className="stat-card">
-              <div className="stat-label">{s.label}</div>
-              <div className="stat-num" style={{ color: s.color || 'var(--text)' }}>
-                {s.raw ?? (s.num == null ? '—' : <AnimatedNumber value={s.num} format={s.fmt}/>)}
-              </div>
-              {s.sub && <div className="stat-sub">{s.sub}</div>}
-              {s.bar != null && s.bar > 0 && (
-                <div style={{ height: 3, background: 'var(--border2)', borderRadius: 2, marginTop: 8, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${Math.min(s.bar * 100, 100)}%`, background: s.barColor, borderRadius: 2, transition: 'width 0.5s ease' }}/>
+          ].map(s => {
+            // Each card gets its own glow tinted by its barColor
+            const glowMap = {
+              'var(--bull)':   'rgba(34,197,94,0.32)',
+              'var(--bear)':   'rgba(244,63,94,0.32)',
+              'var(--accent)': 'rgba(122,162,247,0.30)',
+            };
+            const glow = glowMap[s.barColor] || 'rgba(148,163,184,0.16)';
+            return (
+              <div key={s.label} className="card-glow-wrap" style={{ '--card-glow': glow }}>
+                <div className="stat-card">
+                  <div className="stat-label">{s.label}</div>
+                  <div className="stat-num" style={{ color: s.color || 'var(--text)' }}>
+                    {s.raw ?? (s.num == null ? '—' : <AnimatedNumber value={s.num} format={s.fmt}/>)}
+                  </div>
+                  {s.sub && <div className="stat-sub">{s.sub}</div>}
+                  {s.bar != null && s.bar > 0 && (
+                    <div style={{ height: 3, background: 'var(--border2)', borderRadius: 2, marginTop: 8, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${Math.min(s.bar * 100, 100)}%`, background: s.barColor, borderRadius: 2, transition: 'width 0.5s ease' }}/>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
 
