@@ -560,30 +560,25 @@ export default function App() {
   return (
     <div className="app-layout">
       <nav className="topnav">
-        <div className="topnav-row row-top">
-          <div className="topnav-logo">
-            <h1>Trading Lab</h1>
-            <p>ICT · MNQ / MES</p>
-          </div>
-          <div className="topnav-quote" aria-hidden>Paid for patience.</div>
-          <div className="topnav-actions">
-            <button
-              onClick={() => setPaletteOpen(true)}
-              title="Command palette"
-              className="palette-trigger"
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '5px 8px 5px 10px', borderRadius: 7,
-                border: '1px solid var(--border2)', background: 'var(--surface)',
-                color: 'var(--text3)', cursor: 'pointer', fontSize: 11,
-                fontFamily: 'var(--font)', transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.color = 'var(--text)'; e.currentTarget.style.background = 'var(--surface2)'; }}
-              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text3)'; e.currentTarget.style.background = 'var(--surface)'; }}
-            >
+
+        {/* ── Top bar: search | centred brand | utilities ── */}
+        <div className="topnav-bar">
+          {/* Left — search anchor */}
+          <div className="topnav-bar-left">
+            <button className="palette-trigger" onClick={() => setPaletteOpen(true)} title="Command palette (⌘K)">
               <Icon name="search" size={11}/>
               <kbd className="kbd">⌘K</kbd>
             </button>
+          </div>
+
+          {/* Centre — brand */}
+          <div className="topnav-brand">
+            <div className="topnav-wordmark">Trading Lab</div>
+            <div className="topnav-motto">Paid for patience.</div>
+          </div>
+
+          {/* Right — utilities */}
+          <div className="topnav-actions">
             {settings.accounts?.length > 0 && (
               <AccountFilterPill
                 accounts={settings.accounts}
@@ -592,25 +587,18 @@ export default function App() {
               />
             )}
             <SyncBadge status={syncStatus} hasUser={!!user} />
-
             <button className="icon-btn" onClick={toggleTheme} title={theme === 'dark' ? 'Light mode' : 'Dark mode'}>
               <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={14}/>
             </button>
             <button className="icon-btn" onClick={() => setShowSettings(true)} title="Settings">
               <Icon name="settings" size={14}/>
             </button>
-
             {user && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 4, paddingLeft: 10, borderLeft: '1px solid var(--border)' }}>
-                <div title={user.email} style={{
-                  width: 26, height: 26, borderRadius: '50%',
-                  background: 'var(--accentDim)', border: '1px solid var(--accentBorder)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 11, fontWeight: 700, color: 'var(--accent)', flexShrink: 0,
-                }}>
+              <div className="topnav-user">
+                <div className="user-avatar" title={user.email}>
                   {(user.email || '?')[0].toUpperCase()}
                 </div>
-                <button className="icon-btn" onClick={handleSignOut} title="Sign out" style={{ width: 26, height: 26 }}>
+                <button className="icon-btn" onClick={handleSignOut} title="Sign out">
                   <Icon name="logout" size={13}/>
                 </button>
               </div>
@@ -618,20 +606,20 @@ export default function App() {
           </div>
         </div>
 
-        <div className="topnav-row row-bottom">
-          <div className="topnav-items">
-            {NAV.map(item => (
-              <button
-                key={item.id}
-                className={`nav-item ${page === item.id ? 'active' : ''}`}
-                onClick={() => setPage(item.id)}
-              >
-                <Icon name={item.icon} size={14}/>
-                <span className="label">{item.label}</span>
-              </button>
-            ))}
-          </div>
+        {/* ── Tab strip ── */}
+        <div className="topnav-items">
+          {NAV.map(item => (
+            <button
+              key={item.id}
+              className={`nav-item ${page === item.id ? 'active' : ''}`}
+              onClick={() => setPage(item.id)}
+            >
+              <Icon name={item.icon} size={14}/>
+              <span className="label">{item.label}</span>
+            </button>
+          ))}
         </div>
+
       </nav>
 
       <main className="main">
