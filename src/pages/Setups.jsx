@@ -18,6 +18,7 @@ const BLOCK_TYPES = [
   { type: 'code',    icon: '</>',  label: 'Code',      desc: 'Code block' },
   { type: 'hr',      icon: '—',    label: 'Divider',   desc: 'Horizontal rule' },
   { type: 'img',     icon: '🖼',   label: 'Image',     desc: 'Upload image' },
+  { type: 'cols2',  icon: '⬜⬜',  label: '2 Columns', desc: 'Two side-by-side columns' },
 ];
 
 // Strip HTML tags for preview / search
@@ -77,23 +78,34 @@ function splitHtmlAtCaret(el) {
   return { before: beforeDiv.innerHTML, after: afterDiv.innerHTML };
 }
 
-// Small type-switcher + delete dropdown
-function BlockMenu({ block, onTypeChange, onDelete, onClose }) {
+// Small type-switcher + delete dropdown — uses position:fixed so it escapes stacking contexts
+function BlockMenu({ block, pos, onTypeChange, onDelete, onClose }) {
   const ref = useRef();
+
+  // Delay adding the close-listener so the opening mousedown doesn't immediately close the menu
   useEffect(() => {
-    const fn = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
-    document.addEventListener('mousedown', fn);
-    return () => document.removeEventListener('mousedown', fn);
+    let fn;
+    const timer = setTimeout(() => {
+      fn = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+      document.addEventListener('mousedown', fn);
+    }, 50);
+    return () => { clearTimeout(timer); fn && document.removeEventListener('mousedown', fn); };
   }, [onClose]);
 
+  // Clamp so the menu never clips off-screen
+  const left = Math.min(pos.x, window.innerWidth  - 192);
+  const top  = Math.min(pos.y, window.innerHeight - 420);
+
   return (
-    <div ref={ref} className="block-type-menu" onMouseDown={e => e.stopPropagation()}>
+    <div ref={ref} className="block-type-menu"
+      style={{ position: 'fixed', left, top, zIndex: 9999 }}
+      onMouseDown={e => e.stopPropagation()}>
       <div style={{ fontSize: 10, color: 'var(--text3)', padding: '6px 10px 3px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Turn into</div>
-      {BLOCK_TYPES.filter(t => !['hr','img'].includes(t.type)).map(bt => (
+      {BLOCK_TYPES.filter(t => !['img'].includes(t.type)).map(bt => (
         <button key={bt.type}
           className={`block-type-item${block.type === bt.type ? ' active' : ''}`}
           onMouseDown={e => { e.preventDefault(); onTypeChange(bt.type); onClose(); }}>
-          <span style={{ width: 22, textAlign: 'center', fontFamily: 'var(--mono)', fontSize: 11, flexShrink: 0 }}>{bt.icon}</span>
+          <span style={{ width: 26, textAlign: 'center', fontFamily: 'var(--mono)', fontSize: 11, flexShrink: 0 }}>{bt.icon}</span>
           <span>{bt.label}</span>
         </button>
       ))}
@@ -124,19 +136,31 @@ const Block = React.forwardRef(function Block({
   onDrop,
   onDragEnd,
 }, ref) {
-  const fileRef  = useRef();
-  const localRef = useRef(null);
+  const fileRef    = useRef();
+  const localRef   = useRef(null);
+  const col1Ref    = useRef(null);
+  const col2Ref    = useRef(null);
+  const menuBtnRef = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPos,  setMenuPos]  = useState(null);
 
-  useImperativeHandle(ref, () => localRef.current);
+  useImperativeHandle(ref, () => block.type === 'cols2' ? col1Ref.current : localRef.current);
 
   // Sync block.text (HTML) → DOM only when not focused (to avoid cursor jumping)
   useEffect(() => {
+    if (block.type === 'cols2') {
+      if (isFocused) return;
+      let parsed = { col1: '', col2: '' };
+      try { parsed = JSON.parse(block.text || '{}'); } catch {}
+      if (col1Ref.current && col1Ref.current.innerHTML !== (parsed.col1 || '')) col1Ref.current.innerHTML = parsed.col1 || '';
+      if (col2Ref.current && col2Ref.current.innerHTML !== (parsed.col2 || '')) col2Ref.current.innerHTML = parsed.col2 || '';
+      return;
+    }
     const el = localRef.current;
     if (!el || isFocused) return;
     const next = block.text || '';
     if (el.innerHTML !== next) el.innerHTML = next;
-  }, [block.text, isFocused]);
+  }, [block.text, block.type, isFocused]);
 
   const dragHandleProps = {
     draggable: true,
@@ -147,27 +171,39 @@ const Block = React.forwardRef(function Block({
     title: 'Drag to reorder',
   };
 
+  // ··· button: stopPropagation so the opening mousedown doesn't reach BlockMenu's close-listener
+  const handleMenuBtn = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (menuOpen) {
+      setMenuOpen(false); setMenuPos(null);
+    } else {
+      const rect = menuBtnRef.current?.getBoundingClientRect();
+      if (rect) setMenuPos({ x: rect.left, y: rect.bottom + 4 });
+      setMenuOpen(true);
+    }
+  };
+
+  const blockMenu = menuOpen && menuPos && (
+    <BlockMenu block={block} pos={menuPos}
+      onTypeChange={t => { onTypeChange(block.id, t); setMenuOpen(false); setMenuPos(null); }}
+      onDelete={() => { onRemoveBlock(block.id); setMenuOpen(false); setMenuPos(null); }}
+      onClose={() => { setMenuOpen(false); setMenuPos(null); }}/>
+  );
+
   const actionBar = (
-    <div className="block-actions-wrap">
+    <div className="block-actions-wrap" style={{ opacity: menuOpen ? 1 : undefined }}>
       <button className="block-action-btn" title="Add block below"
         onMouseDown={e => { e.preventDefault(); onAddBelow(idx); }}>
         <Icon name="plus" size={11}/>
       </button>
       <div className="block-handle" {...dragHandleProps}>⋮⋮</div>
-      <div style={{ position: 'relative' }}>
-        <button className="block-action-btn" title="Block options (type, delete)"
-          onMouseDown={e => { e.preventDefault(); setMenuOpen(o => !o); }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="5"  cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
-          </svg>
-        </button>
-        {menuOpen && (
-          <BlockMenu block={block}
-            onTypeChange={t => onTypeChange(block.id, t)}
-            onDelete={() => onRemoveBlock(block.id)}
-            onClose={() => setMenuOpen(false)}/>
-        )}
-      </div>
+      <button ref={menuBtnRef} className="block-action-btn" title="Block options (type, delete)"
+        onMouseDown={handleMenuBtn}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+          <circle cx="5"  cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
+        </svg>
+      </button>
     </div>
   );
 
@@ -175,6 +211,7 @@ const Block = React.forwardRef(function Block({
     return (
       <div className={`block-row${isFocused ? ' is-focused' : ''}${isDragOver ? ' is-over' : ''}`}>
         {actionBar}
+        {blockMenu}
         <div style={{ padding: '8px 0', cursor: 'default', flex: 1 }}>
           <hr style={{ border: 'none', borderTop: '1px solid var(--border2)' }}/>
         </div>
@@ -186,6 +223,7 @@ const Block = React.forwardRef(function Block({
     return (
       <div className={`block-row${isFocused ? ' is-focused' : ''}${isDragOver ? ' is-over' : ''}`}>
         {actionBar}
+        {blockMenu}
         <div style={{ padding: '4px 0', flex: 1 }}>
           {block.imageUrl ? (
             <div className="block-image">
@@ -206,6 +244,46 @@ const Block = React.forwardRef(function Block({
                 onChange={async e => { const f = e.target.files[0]; if (f) onImageUpload(await Store.compressImage(f)); }}/>
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  if (block.type === 'cols2') {
+    let parsed = { col1: '', col2: '' };
+    try { parsed = JSON.parse(block.text || '{}'); } catch {}
+    const colBase = { ...getBlockStyle('p'), background: 'var(--surface2)', border: '1px solid var(--border)',
+      borderRadius: 8, padding: '10px 14px', minHeight: 80, flex: 1 };
+    const handleColInput = (e, key) => {
+      const html = e.currentTarget.innerHTML;
+      const merged = JSON.stringify({
+        col1: key === 'col1' ? html : (col1Ref.current?.innerHTML ?? parsed.col1 ?? ''),
+        col2: key === 'col2' ? html : (col2Ref.current?.innerHTML ?? parsed.col2 ?? ''),
+      });
+      onInput({ currentTarget: { innerHTML: merged, innerText: '' } });
+    };
+    const handleColKey = (e) => {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        (document.activeElement === col1Ref.current ? col2Ref : col1Ref).current?.focus();
+      }
+    };
+    const colPlaceholder = isFocused ? 'Type here...' : '';
+    return (
+      <div className={`block-row${isFocused ? ' is-focused' : ''}${isDragOver ? ' is-over' : ''}`}>
+        {actionBar}
+        {blockMenu}
+        <div style={{ display: 'flex', gap: 12, flex: 1, flexWrap: 'wrap' }}>
+          <div ref={col1Ref} contentEditable suppressContentEditableWarning
+            data-placeholder={colPlaceholder}
+            style={colBase}
+            onInput={e => handleColInput(e, 'col1')}
+            onKeyDown={handleColKey} onFocus={onFocus} onBlur={onBlur}/>
+          <div ref={col2Ref} contentEditable suppressContentEditableWarning
+            data-placeholder={colPlaceholder}
+            style={colBase}
+            onInput={e => handleColInput(e, 'col2')}
+            onKeyDown={handleColKey} onFocus={onFocus} onBlur={onBlur}/>
         </div>
       </div>
     );
@@ -237,6 +315,7 @@ const Block = React.forwardRef(function Block({
   return (
     <div className={`block-row${isFocused ? ' is-focused' : ''}${isDragOver ? ' is-over' : ''}`}>
       {actionBar}
+      {blockMenu}
       {prefix}
       <div
         ref={localRef}

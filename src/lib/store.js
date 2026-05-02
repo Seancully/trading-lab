@@ -709,13 +709,13 @@ export const Store = {
     const lossColor  = '#f43f5e';
     const beColor    = '#f59e0b';
     const statsHtml  = [
-      `<span style="color:var(--text2)">${weekTrades.length} trade${weekTrades.length === 1 ? '' : 's'}</span>`,
-      wins   > 0 ? `<span style="color:${winColor};font-weight:700">${wins}W</span>`   : `<span>${wins}W</span>`,
-      losses > 0 ? `<span style="color:${lossColor};font-weight:700">${losses}L</span>` : `<span>${losses}L</span>`,
-      bes    > 0 ? `<span style="color:${beColor};font-weight:700">${bes}BE</span>`     : `<span>${bes}BE</span>`,
-      `<span style="color:var(--text3)">${winRate}% WR</span>`,
+      `<span style="color:var(--text2);font-weight:600">${weekTrades.length} trade${weekTrades.length === 1 ? '' : 's'}</span>`,
+      wins   > 0 ? `<span style="color:${winColor};font-weight:700">${wins}W</span>`    : `<span style="font-weight:600">${wins}W</span>`,
+      losses > 0 ? `<span style="color:${lossColor};font-weight:700">${losses}L</span>` : `<span style="font-weight:600">${losses}L</span>`,
+      bes    > 0 ? `<span style="color:${beColor};font-weight:700">${bes}BE</span>`      : `<span style="font-weight:600">${bes}BE</span>`,
+      `<span style="color:var(--text3);font-weight:600">${winRate}% WR</span>`,
       `<span style="color:${pnlColor};font-weight:700">${fmt(totalPnl)}</span>`,
-    ].join('<span style="color:var(--text3)"> · </span>');
+    ].join('<span style="color:var(--text3);font-weight:600"> · </span>');
 
     const blocks = [
       { id: uid(), type: 'h1',  text: `Week of ${monthName} – ${endName}` },
