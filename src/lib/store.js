@@ -703,9 +703,23 @@ export const Store = {
     const monthName = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const endName = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
+    // Build a color-coded stats summary line using HTML spans
+    const pnlColor   = totalPnl > 0 ? '#22c55e' : totalPnl < 0 ? '#f43f5e' : '#94a3b8';
+    const winColor   = '#22c55e';
+    const lossColor  = '#f43f5e';
+    const beColor    = '#f59e0b';
+    const statsHtml  = [
+      `<span style="color:var(--text2)">${weekTrades.length} trade${weekTrades.length === 1 ? '' : 's'}</span>`,
+      wins   > 0 ? `<span style="color:${winColor};font-weight:700">${wins}W</span>`   : `<span>${wins}W</span>`,
+      losses > 0 ? `<span style="color:${lossColor};font-weight:700">${losses}L</span>` : `<span>${losses}L</span>`,
+      bes    > 0 ? `<span style="color:${beColor};font-weight:700">${bes}BE</span>`     : `<span>${bes}BE</span>`,
+      `<span style="color:var(--text3)">${winRate}% WR</span>`,
+      `<span style="color:${pnlColor};font-weight:700">${fmt(totalPnl)}</span>`,
+    ].join('<span style="color:var(--text3)"> · </span>');
+
     const blocks = [
       { id: uid(), type: 'h1',  text: `Week of ${monthName} – ${endName}` },
-      { id: uid(), type: 'p',   text: `${weekTrades.length} trade${weekTrades.length === 1 ? '' : 's'} · ${wins}W · ${losses}L · ${bes}BE · ${winRate}% WR · ${fmt(totalPnl)}` },
+      { id: uid(), type: 'p',   text: statsHtml },
       { id: uid(), type: 'bq',  text: 'Fill this in with Claude: hit "Copy week for Claude" on the Performance tab (or use the toast below — it\'s already on your clipboard). Paste it into a chat with Claude, attach a screenshot of each trade card from the Journal, and ask Claude to help you draft the sections below. Then refine in your own words.' },
       { id: uid(), type: 'h2',  text: 'The numbers' },
       { id: uid(), type: 'li',  text: `Total P&L: ${fmt(totalPnl)}` },

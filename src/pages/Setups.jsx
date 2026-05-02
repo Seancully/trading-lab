@@ -4,38 +4,27 @@ import { Icon, Btn } from '../components/Shared.jsx';
 import SelectionToolbar from '../components/SelectionToolbar.jsx';
 
 const BLOCK_TYPES = [
-  { type: 'p',    icon: '¶',    label: 'Text',      desc: 'Plain paragraph' },
-  { type: 'h1',   icon: 'H1',   label: 'Heading 1', desc: 'Large title' },
-  { type: 'h2',   icon: 'H2',   label: 'Heading 2', desc: 'Section header' },
-  { type: 'h3',   icon: 'H3',   label: 'Heading 3', desc: 'Subsection' },
-  { type: 'li',   icon: '•',    label: 'Bullet',    desc: 'Bullet list item' },
-  { type: 'num',  icon: '1.',   label: 'Numbered',  desc: 'Numbered list' },
-  { type: 'bq',   icon: '"',    label: 'Callout',   desc: 'Highlighted note' },
-  { type: 'hl',   icon: 'Hi',   label: 'Highlight', desc: 'Soft highlight block' },
-  { type: 'accent', icon: 'A',  label: 'Accent',    desc: 'Accent color text' },
-  { type: 'success', icon: 'OK', label: 'Success',  desc: 'Green emphasis' },
-  { type: 'danger', icon: '!',  label: 'Warning',   desc: 'Red emphasis' },
-  { type: 'code', icon: '</>',  label: 'Code',      desc: 'Code block' },
-  { type: 'hr',   icon: '—',    label: 'Divider',   desc: 'Horizontal rule' },
-  { type: 'img',  icon: '🖼',   label: 'Image',     desc: 'Upload image' },
+  { type: 'p',       icon: '¶',    label: 'Text',      desc: 'Plain paragraph' },
+  { type: 'h1',      icon: 'H1',   label: 'Heading 1', desc: 'Large title' },
+  { type: 'h2',      icon: 'H2',   label: 'Heading 2', desc: 'Section header' },
+  { type: 'h3',      icon: 'H3',   label: 'Heading 3', desc: 'Subsection' },
+  { type: 'li',      icon: '•',    label: 'Bullet',    desc: 'Bullet list item' },
+  { type: 'num',     icon: '1.',   label: 'Numbered',  desc: 'Numbered list' },
+  { type: 'bq',      icon: '"',    label: 'Callout',   desc: 'Highlighted note' },
+  { type: 'hl',      icon: 'Hi',   label: 'Highlight', desc: 'Soft highlight block' },
+  { type: 'accent',  icon: 'A',    label: 'Accent',    desc: 'Accent color text' },
+  { type: 'success', icon: 'OK',   label: 'Success',   desc: 'Green emphasis' },
+  { type: 'danger',  icon: '!',    label: 'Warning',   desc: 'Red emphasis' },
+  { type: 'code',    icon: '</>',  label: 'Code',      desc: 'Code block' },
+  { type: 'hr',      icon: '—',    label: 'Divider',   desc: 'Horizontal rule' },
+  { type: 'img',     icon: '🖼',   label: 'Image',     desc: 'Upload image' },
 ];
+
+// Strip HTML tags for preview / search
+const stripHtml = (h = '') => h.replace(/<[^>]*>/g, '');
 
 function newBlock(type = 'p', text = '') {
   return { id: Store.uid(), type, text };
-}
-
-// Walk the contenteditable's selection and return the caret offset within
-// the element's textContent. Used to split a block at the caret on Enter.
-function getCaretOffset(el) {
-  if (!el) return 0;
-  const sel = window.getSelection();
-  if (!sel || !sel.rangeCount) return (el.innerText || '').length;
-  const range = sel.getRangeAt(0);
-  if (!el.contains(range.endContainer)) return (el.innerText || '').length;
-  const pre = range.cloneRange();
-  pre.selectNodeContents(el);
-  pre.setEnd(range.endContainer, range.endOffset);
-  return pre.toString().length;
 }
 
 function getBlockStyle(type) {
@@ -46,23 +35,74 @@ function getBlockStyle(type) {
     display: 'block', minHeight: '1.65em',
   };
   switch (type) {
-    case 'h1':   return { ...base, fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.2, padding: '2px 0' };
-    case 'h2':   return { ...base, fontSize: 20, fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.25, padding: '1px 0' };
-    case 'h3':   return { ...base, fontSize: 16, fontWeight: 600, lineHeight: 1.3, padding: '1px 0' };
-    case 'bq':   return { ...base, fontSize: 13, fontStyle: 'italic', color: 'var(--text2)', padding: '10px 14px',
+    case 'h1':     return { ...base, fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.2, padding: '2px 0', marginTop: 24 };
+    case 'h2':     return { ...base, fontSize: 20, fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.25, padding: '1px 0', marginTop: 18 };
+    case 'h3':     return { ...base, fontSize: 16, fontWeight: 600, lineHeight: 1.3, padding: '1px 0', marginTop: 12 };
+    case 'bq':     return { ...base, fontSize: 13, fontStyle: 'italic', color: 'var(--text2)', padding: '10px 14px',
       background: 'var(--surface2)', borderLeft: '3px solid var(--accent)', borderRadius: '0 6px 6px 0' };
-    case 'hl':   return { ...base, fontSize: 13, background: 'var(--accentDim)', border: '1px solid var(--accentBorder)',
+    case 'hl':     return { ...base, fontSize: 13, background: 'var(--accentDim)', border: '1px solid var(--accentBorder)',
       padding: '6px 10px', borderRadius: 6 };
     case 'accent': return { ...base, fontSize: 14, color: 'var(--accent)', fontWeight: 600 };
-    case 'success': return { ...base, fontSize: 13, background: 'var(--bullDim)', border: '1px solid rgba(34,197,94,0.25)',
+    case 'success':return { ...base, fontSize: 13, background: 'var(--bullDim)', border: '1px solid rgba(34,197,94,0.25)',
       padding: '6px 10px', borderRadius: 6, color: 'var(--bull)', fontWeight: 600 };
     case 'danger': return { ...base, fontSize: 13, background: 'var(--bearDim)', border: '1px solid rgba(239,68,68,0.25)',
       padding: '6px 10px', borderRadius: 6, color: 'var(--bear)', fontWeight: 600 };
-    case 'code': return { ...base, fontFamily: 'var(--mono)', fontSize: 12,
+    case 'code':   return { ...base, fontFamily: 'var(--mono)', fontSize: 12,
       background: 'var(--surface2)', border: '1px solid var(--border2)',
       padding: '10px 14px', borderRadius: 6, color: 'var(--accent)', whiteSpace: 'pre-wrap' };
-    default:     return { ...base, fontSize: 14 };
+    default:       return { ...base, fontSize: 14 };
   }
+}
+
+// Split the innerHTML of `el` at the current caret position.
+// Returns { before, after } as HTML strings.
+function splitHtmlAtCaret(el) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return { before: el.innerHTML, after: '' };
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+
+  const beforeRange = document.createRange();
+  beforeRange.selectNodeContents(el);
+  beforeRange.setEnd(range.startContainer, range.startOffset);
+  const beforeDiv = document.createElement('div');
+  beforeDiv.appendChild(beforeRange.cloneContents());
+
+  const afterRange = document.createRange();
+  afterRange.selectNodeContents(el);
+  afterRange.setStart(range.startContainer, range.startOffset);
+  const afterDiv = document.createElement('div');
+  afterDiv.appendChild(afterRange.cloneContents());
+
+  return { before: beforeDiv.innerHTML, after: afterDiv.innerHTML };
+}
+
+// Small type-switcher + delete dropdown
+function BlockMenu({ block, onTypeChange, onDelete, onClose }) {
+  const ref = useRef();
+  useEffect(() => {
+    const fn = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+    document.addEventListener('mousedown', fn);
+    return () => document.removeEventListener('mousedown', fn);
+  }, [onClose]);
+
+  return (
+    <div ref={ref} className="block-type-menu" onMouseDown={e => e.stopPropagation()}>
+      <div style={{ fontSize: 10, color: 'var(--text3)', padding: '6px 10px 3px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Turn into</div>
+      {BLOCK_TYPES.filter(t => !['hr','img'].includes(t.type)).map(bt => (
+        <button key={bt.type}
+          className={`block-type-item${block.type === bt.type ? ' active' : ''}`}
+          onMouseDown={e => { e.preventDefault(); onTypeChange(bt.type); onClose(); }}>
+          <span style={{ width: 22, textAlign: 'center', fontFamily: 'var(--mono)', fontSize: 11, flexShrink: 0 }}>{bt.icon}</span>
+          <span>{bt.label}</span>
+        </button>
+      ))}
+      <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0' }}/>
+      <button className="block-type-item danger" onMouseDown={e => { e.preventDefault(); onDelete(); onClose(); }}>
+        <Icon name="trash" size={12}/> Delete block
+      </button>
+    </div>
+  );
 }
 
 const Block = React.forwardRef(function Block({
@@ -73,6 +113,8 @@ const Block = React.forwardRef(function Block({
   onImageUpload,
   onPasteImage,
   onRemoveBlock,
+  onAddBelow,
+  onTypeChange,
   isFocused,
   isDragOver,
   onFocus,
@@ -82,30 +124,57 @@ const Block = React.forwardRef(function Block({
   onDrop,
   onDragEnd,
 }, ref) {
-  const fileRef = useRef();
+  const fileRef  = useRef();
   const localRef = useRef(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useImperativeHandle(ref, () => localRef.current);
 
+  // Sync block.text (HTML) → DOM only when not focused (to avoid cursor jumping)
   useEffect(() => {
     const el = localRef.current;
     if (!el || isFocused) return;
     const next = block.text || '';
-    if (el.innerText !== next) el.innerText = next;
+    if (el.innerHTML !== next) el.innerHTML = next;
   }, [block.text, isFocused]);
+
+  const dragHandleProps = {
+    draggable: true,
+    onDragStart: (e) => onDragStart?.(e, block.id),
+    onDragOver:  (e) => onDragOver?.(e, block.id),
+    onDrop:      (e) => onDrop?.(e, block.id),
+    onDragEnd:   (e) => onDragEnd?.(e, block.id),
+    title: 'Drag to reorder',
+  };
+
+  const actionBar = (
+    <div className="block-actions-wrap">
+      <button className="block-action-btn" title="Add block below"
+        onMouseDown={e => { e.preventDefault(); onAddBelow(idx); }}>
+        <Icon name="plus" size={11}/>
+      </button>
+      <div className="block-handle" {...dragHandleProps}>⋮⋮</div>
+      <div style={{ position: 'relative' }}>
+        <button className="block-action-btn" title="Block options (type, delete)"
+          onMouseDown={e => { e.preventDefault(); setMenuOpen(o => !o); }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="5"  cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
+          </svg>
+        </button>
+        {menuOpen && (
+          <BlockMenu block={block}
+            onTypeChange={t => onTypeChange(block.id, t)}
+            onDelete={() => onRemoveBlock(block.id)}
+            onClose={() => setMenuOpen(false)}/>
+        )}
+      </div>
+    </div>
+  );
 
   if (block.type === 'hr') {
     return (
-      <div className={`block-row ${isFocused ? 'is-focused' : ''} ${isDragOver ? 'is-over' : ''}`}>
-        <div
-          className="block-handle"
-          draggable
-          onDragStart={(e) => onDragStart?.(e, block.id)}
-          onDragOver={(e) => onDragOver?.(e, block.id)}
-          onDrop={(e) => onDrop?.(e, block.id)}
-          onDragEnd={(e) => onDragEnd?.(e, block.id)}
-          title="Drag to reorder"
-        >⋮⋮</div>
+      <div className={`block-row${isFocused ? ' is-focused' : ''}${isDragOver ? ' is-over' : ''}`}>
+        {actionBar}
         <div style={{ padding: '8px 0', cursor: 'default', flex: 1 }}>
           <hr style={{ border: 'none', borderTop: '1px solid var(--border2)' }}/>
         </div>
@@ -115,41 +184,28 @@ const Block = React.forwardRef(function Block({
 
   if (block.type === 'img') {
     return (
-      <div className={`block-row ${isFocused ? 'is-focused' : ''} ${isDragOver ? 'is-over' : ''}`}>
-        <div
-          className="block-handle"
-          draggable
-          onDragStart={(e) => onDragStart?.(e, block.id)}
-          onDragOver={(e) => onDragOver?.(e, block.id)}
-          onDrop={(e) => onDrop?.(e, block.id)}
-          title="Drag to reorder"
-        >⋮⋮</div>
+      <div className={`block-row${isFocused ? ' is-focused' : ''}${isDragOver ? ' is-over' : ''}`}>
+        {actionBar}
         <div style={{ padding: '4px 0', flex: 1 }}>
-        {block.imageUrl ? (
-          <div className="block-image">
-            <img src={block.imageUrl} alt="" style={{ maxWidth: '100%', borderRadius: 8, border: '1px solid var(--border)', display: 'block' }}/>
-            <button
-              type="button"
-              className="block-image-remove"
-              title="Remove image"
-              onClick={() => onRemoveBlock?.(block.id)}
-            >
-              <Icon name="trash" size={12}/>
-            </button>
-            <div ref={localRef} contentEditable suppressContentEditableWarning
-              data-placeholder={isFocused ? 'Caption...' : ''} onInput={onInput}
-              style={{ fontSize: 12, color: 'var(--text3)', marginTop: 6, outline: 'none', fontStyle: 'italic', minHeight: '1.4em' }}
-              onKeyDown={onKeyDown} onFocus={onFocus} onBlur={onBlur}
-            />
-          </div>
-        ) : (
-          <div className="upload-area" style={{ padding: 20 }} onClick={() => fileRef.current.click()}>
-            <Icon name="image" size={20}/>
-            <span style={{ fontSize: 12, marginTop: 4 }}>Click to upload image</span>
-            <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }}
-              onChange={async e => { const f = e.target.files[0]; if (f) onImageUpload(await Store.compressImage(f)); }}/>
-          </div>
-        )}
+          {block.imageUrl ? (
+            <div className="block-image">
+              <img src={block.imageUrl} alt="" style={{ maxWidth: '100%', borderRadius: 8, border: '1px solid var(--border)', display: 'block' }}/>
+              <button type="button" className="block-image-remove" title="Remove image" onClick={() => onRemoveBlock?.(block.id)}>
+                <Icon name="trash" size={12}/>
+              </button>
+              <div ref={localRef} contentEditable suppressContentEditableWarning
+                data-placeholder={isFocused ? 'Caption...' : ''}
+                onInput={onInput} onKeyDown={onKeyDown} onFocus={onFocus} onBlur={onBlur}
+                style={{ fontSize: 12, color: 'var(--text3)', marginTop: 6, outline: 'none', fontStyle: 'italic', minHeight: '1.4em' }}/>
+            </div>
+          ) : (
+            <div className="upload-area" style={{ padding: 20 }} onClick={() => fileRef.current.click()}>
+              <Icon name="image" size={20}/>
+              <span style={{ fontSize: 12, marginTop: 4 }}>Click to upload image</span>
+              <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }}
+                onChange={async e => { const f = e.target.files[0]; if (f) onImageUpload(await Store.compressImage(f)); }}/>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -163,8 +219,8 @@ const Block = React.forwardRef(function Block({
 
   const placeholder = isFocused
     ? (block.type === 'h1' ? 'Heading 1' : block.type === 'h2' ? 'Heading 2' :
-      block.type === 'h3' ? 'Heading 3' : block.type === 'bq' ? 'Callout...' :
-      block.type === 'code' ? 'Code...' : "Type '/' for commands")
+       block.type === 'h3' ? 'Heading 3' : block.type === 'bq' ? 'Callout...' :
+       block.type === 'code' ? 'Code...' : "Type '/' for commands")
     : '';
 
   const handlePaste = (e) => {
@@ -173,27 +229,14 @@ const Block = React.forwardRef(function Block({
     for (const item of items) {
       if (item.type && item.type.startsWith('image/')) {
         const file = item.getAsFile();
-        if (file) {
-          e.preventDefault();
-          e.stopPropagation();
-          onPasteImage(file, block.id);
-          return;
-        }
+        if (file) { e.preventDefault(); e.stopPropagation(); onPasteImage(file, block.id); return; }
       }
     }
   };
 
   return (
-    <div className={`block-row ${isFocused ? 'is-focused' : ''} ${isDragOver ? 'is-over' : ''}`}>
-      <div
-        className="block-handle"
-        draggable
-        onDragStart={(e) => onDragStart?.(e, block.id)}
-        onDragOver={(e) => onDragOver?.(e, block.id)}
-        onDrop={(e) => onDrop?.(e, block.id)}
-        onDragEnd={(e) => onDragEnd?.(e, block.id)}
-        title="Drag to reorder"
-      >⋮⋮</div>
+    <div className={`block-row${isFocused ? ' is-focused' : ''}${isDragOver ? ' is-over' : ''}`}>
+      {actionBar}
       {prefix}
       <div
         ref={localRef}
@@ -223,12 +266,10 @@ function SlashMenu({ pos, query, onSelect, onClose }) {
   });
 
   useEffect(() => { setSel(0); }, [query]);
-
   useEffect(() => {
     const el = itemRefs.current[sel];
     if (el) el.scrollIntoView({ block: 'nearest' });
   }, [sel, filtered.length]);
-
   useEffect(() => {
     if (!filtered.length) return;
     const fn = (e) => {
@@ -247,12 +288,13 @@ function SlashMenu({ pos, query, onSelect, onClose }) {
 
   const margin = 8;
   const left = Math.max(margin, Math.min(pos.x, window.innerWidth - 260 - margin));
-  const top = Math.max(8, Math.min(pos.y + 4, window.innerHeight - 320));
+  const top  = Math.max(8, Math.min(pos.y + 4, window.innerHeight - 320));
 
   return (
     <div className="slash-menu" style={{ position: 'fixed', top, left, zIndex: 300 }}>
       {filtered.map((t, i) => (
-        <div key={t.type} ref={el => { itemRefs.current[i] = el; }} className={`slash-menu-item ${i === sel ? 'selected' : ''}`}
+        <div key={t.type} ref={el => { itemRefs.current[i] = el; }}
+          className={`slash-menu-item${i === sel ? ' selected' : ''}`}
           onMouseEnter={() => setSel(i)}
           onMouseDown={e => { e.preventDefault(); onSelect(t.type); }}>
           <div className="slash-menu-icon">{t.icon}</div>
@@ -266,6 +308,18 @@ function SlashMenu({ pos, query, onSelect, onClose }) {
   );
 }
 
+// Markdown shortcuts: typing these prefixes at the start of an empty block
+// converts it to the corresponding type, just like Notion.
+const MD_SHORTCUTS = [
+  { prefix: '# ',   type: 'h1'   },
+  { prefix: '## ',  type: 'h2'   },
+  { prefix: '### ', type: 'h3'   },
+  { prefix: '- ',   type: 'li'   },
+  { prefix: '* ',   type: 'li'   },
+  { prefix: '> ',   type: 'bq'   },
+  { prefix: '```',  type: 'code' },
+];
+
 function NoteEditor({ note, onSave, onDelete, onBack }) {
   const [title,  setTitle]  = useState(note.title  || '');
   const [emoji,  setEmoji]  = useState(note.emoji  || '📝');
@@ -273,16 +327,16 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
   const [blocks, setBlocks] = useState(
     note.blocks?.length ? note.blocks.map(b => ({ ...b })) : [newBlock('p')]
   );
-  const [newTag, setNewTag] = useState('');
-  const [slash,  setSlash]  = useState(null);
-  const [focusedId, setFocusedId] = useState(null);
-  const [titleFocused, setTitleFocused] = useState(false);
-  const [dragOverId, setDragOverId] = useState(null);
+  const [newTag,      setNewTag]      = useState('');
+  const [slash,       setSlash]       = useState(null);
+  const [focusedId,   setFocusedId]   = useState(null);
+  const [titleFocused,setTitleFocused]= useState(false);
+  const [dragOverId,  setDragOverId]  = useState(null);
   const blockRefs  = useRef({});
   const bodyRef    = useRef(null);
   const saveTimer  = useRef(null);
-  const titleRef = useRef(null);
-  const dragId = useRef(null);
+  const titleRef   = useRef(null);
+  const dragId     = useRef(null);
 
   const schedSave = useCallback((t, b, tg, em) => {
     clearTimeout(saveTimer.current);
@@ -324,7 +378,11 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
   };
 
   const deleteBlock = (idx) => {
-    if (blocks.length <= 1) return;
+    if (blocks.length <= 1) {
+      // Clear content instead of deleting the last block
+      setBlocks(bs => bs.map((b, i) => i === idx ? { ...b, type: 'p', text: '' } : b));
+      return;
+    }
     const prevId = blocks[idx - 1]?.id;
     setBlocks(bs => bs.filter((_, i) => i !== idx));
     if (prevId) focusBlock(prevId);
@@ -344,13 +402,17 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
     });
   };
 
-  const updateBlockText = (id, text) => {
+  const changeBlockType = (id, newType) => {
+    setBlocks(bs => bs.map(b => b.id === id ? { ...b, type: newType } : b));
+  };
+
+  const updateBlockHtml = (id, html) => {
     setBlocks(bs => {
       const idx = bs.findIndex(b => b.id === id);
       if (idx === -1) return bs;
-      if ((bs[idx].text || '') === text) return bs;
+      if ((bs[idx].text || '') === html) return bs;
       const next = [...bs];
-      next[idx] = { ...next[idx], text };
+      next[idx] = { ...next[idx], text: html };
       return next;
     });
   };
@@ -359,7 +421,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
     if (!fromId || !toId || fromId === toId) return;
     setBlocks(bs => {
       const from = bs.findIndex(b => b.id === fromId);
-      const to = bs.findIndex(b => b.id === toId);
+      const to   = bs.findIndex(b => b.id === toId);
       if (from === -1 || to === -1) return bs;
       const next = [...bs];
       const [item] = next.splice(from, 1);
@@ -371,8 +433,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
   const getCaretPos = () => {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return null;
-    const range = sel.getRangeAt(0).cloneRange();
-    range.collapse(true);
+    const range = sel.getRangeAt(0).cloneRange(); range.collapse(true);
     const rect = range.getBoundingClientRect();
     if (rect && (rect.top || rect.left)) return { x: rect.left, y: rect.bottom };
     return null;
@@ -395,7 +456,10 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
   };
 
   const handleInput = (e, blockId) => {
-    const text = e.currentTarget.innerText || '';
+    const html = e.currentTarget.innerHTML || '';
+    const text = e.currentTarget.innerText || '';   // plain text for slash + markdown detection
+
+    // ── Slash menu ───────────────────────────────────────────────────────────
     const info = getSlashInfo(text);
     if (info) {
       const caret = getCaretPos();
@@ -410,7 +474,31 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
     } else if (slash?.blockId === blockId) {
       setSlash(null);
     }
-    updateBlockText(blockId, text);
+
+    // ── Markdown shortcuts ───────────────────────────────────────────────────
+    const block = blocks.find(b => b.id === blockId);
+    if (block) {
+      for (const { prefix, type } of MD_SHORTCUTS) {
+        if (text === prefix || text.startsWith(prefix)) {
+          const content = text.startsWith(prefix) ? text.slice(prefix.length) : '';
+          setBlocks(bs => bs.map(b => b.id === blockId ? { ...b, type, text: content } : b));
+          setTimeout(() => {
+            const el2 = blockRefs.current[blockId];
+            if (el2) {
+              el2.innerHTML = content;
+              el2.focus();
+              const r = document.createRange();
+              r.selectNodeContents(el2); r.collapse(false);
+              window.getSelection()?.removeAllRanges();
+              window.getSelection()?.addRange(r);
+            }
+          }, 10);
+          return;
+        }
+      }
+    }
+
+    updateBlockHtml(blockId, html);
   };
 
   const handleKeyDown = (e, block, idx) => {
@@ -422,6 +510,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
     if (slash && ['ArrowDown','ArrowUp','Enter'].includes(e.key)) return;
     if (e.key === 'Escape' && slash) { setSlash(null); return; }
 
+    // ── Enter: split block at caret ─────────────────────────────────────────
     if (e.key === 'Enter' && !e.shiftKey) {
       if (block.type === 'code') return;
       e.preventDefault();
@@ -429,17 +518,17 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
       const el = blockRefs.current[block.id];
       const currentText = el?.innerText || '';
 
-      // Empty list item → convert to paragraph (existing behavior)
+      // Empty list item → escape to paragraph
       if ((block.type === 'li' || block.type === 'num') && !currentText.trim()) {
         setBlocks(bs => bs.map(b => b.id === block.id ? { ...b, type: 'p', text: '' } : b));
-        focusBlock(block.id);
+        setTimeout(() => {
+          const el2 = blockRefs.current[block.id];
+          if (el2) { el2.innerHTML = ''; el2.focus(); }
+        }, 10);
         return;
       }
 
-      // Split at the caret: text before stays, text after moves to a new block.
-      const offset = getCaretOffset(el);
-      const before = currentText.slice(0, offset);
-      const after  = currentText.slice(offset);
+      const { before, after } = el ? splitHtmlAtCaret(el) : { before: block.text || '', after: '' };
       const continueType = (block.type === 'li' || block.type === 'num') ? block.type : 'p';
       const newId = Store.uid();
 
@@ -451,26 +540,28 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
         next.splice(i + 1, 0, { id: newId, type: continueType, text: after });
         return next;
       });
-      // Focus the new block at the start of its content
+
       setTimeout(() => {
         const el2 = blockRefs.current[newId];
         if (!el2) return;
+        el2.innerHTML = after;
         el2.focus();
         const r = document.createRange();
-        r.selectNodeContents(el2);
-        r.collapse(true);
-        const s = window.getSelection();
-        s.removeAllRanges(); s.addRange(r);
+        r.selectNodeContents(el2); r.collapse(true);
+        window.getSelection()?.removeAllRanges();
+        window.getSelection()?.addRange(r);
       }, 30);
       return;
     }
 
+    // ── Backspace: delete empty block ────────────────────────────────────────
     if (e.key === 'Backspace') {
       const text = blockRefs.current[block.id]?.innerText || '';
-      if (text === '') { e.preventDefault(); deleteBlock(idx); return; }
+      if (!text.trim()) { e.preventDefault(); deleteBlock(idx); return; }
       if (text === '/' && slash) setSlash(null);
     }
 
+    // ── Tab: cycle heading level ─────────────────────────────────────────────
     if (e.key === 'Tab') {
       e.preventDefault();
       const cycle = { p: 'h1', h1: 'h2', h2: 'h3', h3: 'p' };
@@ -494,7 +585,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
       setBlocks(bs => bs.map(b => b.id === blockId ? { ...b, type, text: newText } : b));
       setTimeout(() => {
         const el2 = blockRefs.current[blockId];
-        if (el2) { el2.innerText = newText; focusBlock(blockId); }
+        if (el2) { el2.innerHTML = newText; focusBlock(blockId); }
       }, 20);
     }
     setSlash(null);
@@ -506,30 +597,22 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
     e.dataTransfer.effectAllowed = 'move';
     try { e.dataTransfer.setData('text/plain', id); } catch {}
   };
-
   const handleDragOver = (e, id) => {
     if (!dragId.current || dragId.current === id) return;
     e.preventDefault();
     setDragOverId(id);
   };
-
   const handleDrop = (e, id) => {
     e.preventDefault();
-    const from = dragId.current;
-    dragId.current = null;
-    setDragOverId(null);
+    const from = dragId.current; dragId.current = null; setDragOverId(null);
     moveBlock(from, id);
   };
+  const handleDragEnd = () => { dragId.current = null; setDragOverId(null); };
 
   const handlePasteImage = async (file, id) => {
     if (!file || !file.type.startsWith('image/')) return;
     const imageUrl = await Store.compressImage(file);
     setBlocks(bs => bs.map(b => b.id === id ? { ...b, type: 'img', imageUrl, text: '' } : b));
-  };
-
-  const handleDragEnd = () => {
-    dragId.current = null;
-    setDragOverId(null);
   };
 
   const addTag = () => {
@@ -538,12 +621,16 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
     setNewTag('');
   };
 
-  const lastUpdated = note.updatedAt ? new Date(note.updatedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+  const lastUpdated = note.updatedAt
+    ? new Date(note.updatedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : '';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* ── Toolbar ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-        <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', display: 'flex', gap: 4, alignItems: 'center', fontSize: 12, fontFamily: 'var(--font)' }}>
+        <button onClick={onBack}
+          style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', display: 'flex', gap: 4, alignItems: 'center', fontSize: 12, fontFamily: 'var(--font)' }}>
           <Icon name="chevronL" size={13}/> Notes
         </button>
         <div style={{ flex: 1 }}/>
@@ -554,12 +641,12 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
         </button>
       </div>
 
+      {/* ── Body ── */}
       <div
         ref={bodyRef}
         style={{ flex: 1, overflowY: 'auto', padding: '36px 52px 80px' }}
         onPaste={async (e) => {
           if (e.defaultPrevented) return;
-          // 1) Image in clipboard → insert as a new img block after the focused one.
           const items = e.clipboardData?.items || [];
           for (const item of items) {
             if (item.type && item.type.startsWith('image/')) {
@@ -577,24 +664,18 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
               return;
             }
           }
-
-          // 2) Plain-text paste with multiple lines → split into blocks like Notion.
-          //    Single-line text falls through to the browser so the caret stays put.
           const text = e.clipboardData?.getData('text/plain') || '';
           if (!text || !text.includes('\n')) return;
           e.preventDefault();
           const lines = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
           if (!lines.length) return;
           const newBlocks = lines.map(t => ({ id: Store.uid(), type: 'p', text: t }));
-
           setBlocks(bs => {
             const idx = bs.findIndex(b => b.id === focusedId);
-            // If the focused block is empty, replace it with the first pasted line
-            // and insert the rest after; otherwise insert all after the current.
             if (idx >= 0) {
               const next = [...bs];
               const cur = next[idx];
-              if (!cur.text || !cur.text.trim()) {
+              if (!cur.text || !stripHtml(cur.text).trim()) {
                 next[idx] = { ...cur, text: newBlocks[0].text };
                 next.splice(idx + 1, 0, ...newBlocks.slice(1));
               } else {
@@ -604,7 +685,6 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
             }
             return [...bs, ...newBlocks];
           });
-          // Focus the last inserted block
           const last = newBlocks[newBlocks.length - 1];
           setTimeout(() => focusBlock(last.id), 30);
         }}
@@ -616,8 +696,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
           contentEditable suppressContentEditableWarning
           data-placeholder={titleFocused ? 'Untitled' : ''}
           style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-0.025em', outline: 'none',
-            color: 'var(--text)', lineHeight: 1.2, marginBottom: 14,
-            minHeight: '1.2em', display: 'block' }}
+            color: 'var(--text)', lineHeight: 1.2, marginBottom: 14, minHeight: '1.2em', display: 'block' }}
           onInput={e => setTitle(e.target.innerText || '')}
           onFocus={() => setTitleFocused(true)}
           onBlur={() => setTitleFocused(false)}
@@ -659,6 +738,8 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
               onKeyDown={e => handleKeyDown(e, block, idx)}
               onPasteImage={handlePasteImage}
               onRemoveBlock={removeBlockById}
+              onAddBelow={(i) => insertBlock(i)}
+              onTypeChange={changeBlockType}
               onFocus={() => setFocusedId(block.id)}
               onBlur={() => setFocusedId(id => id === block.id ? null : id)}
               isFocused={focusedId === block.id}
@@ -698,9 +779,12 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
 }
 
 function NoteListItem({ note, active, onClick }) {
-  const preview = note.blocks?.find(b => b.type === 'p' && b.text)?.text?.slice(0, 55) || '';
+  const preview = (() => {
+    const b = note.blocks?.find(b => b.type === 'p' && b.text);
+    return b ? stripHtml(b.text).slice(0, 55) : '';
+  })();
   return (
-    <div className={`note-list-item ${active ? 'active' : ''}`} onClick={onClick}>
+    <div className={`note-list-item${active ? ' active' : ''}`} onClick={onClick}>
       <h4>{note.emoji || '📝'} {note.title || 'Untitled'}</h4>
       {preview && <p>{preview}</p>}
       <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 3 }}>
@@ -712,9 +796,9 @@ function NoteListItem({ note, active, onClick }) {
 }
 
 export default function Setups() {
-  const [notes, setNotes] = useState(() => Store.getNotes());
+  const [notes,      setNotes]      = useState(() => Store.getNotes());
   const [selectedId, setSelectedId] = useState(null);
-  const [search, setSearch] = useState('');
+  const [search,     setSearch]     = useState('');
 
   const createNote = () => {
     const note = {
@@ -732,7 +816,6 @@ export default function Setups() {
     const open = (e) => {
       const id = e.detail?.id;
       if (!id) return;
-      // Refresh notes from store so the new one is visible, then select it.
       setNotes(Store.getNotes());
       setSelectedId(id);
     };
@@ -743,14 +826,14 @@ export default function Setups() {
     };
   }, []);
 
-  const handleSave = (note) => setNotes(Store.saveNote(note));
-  const handleDelete = (id) => { setNotes(Store.deleteNote(id)); setSelectedId(null); };
+  const handleSave   = (note) => setNotes(Store.saveNote(note));
+  const handleDelete = (id)   => { setNotes(Store.deleteNote(id)); setSelectedId(null); };
 
   const filtered = notes.filter(n =>
     !search ||
     n.title?.toLowerCase().includes(search.toLowerCase()) ||
     n.tags?.some(t => t.toLowerCase().includes(search.toLowerCase())) ||
-    n.blocks?.some(b => b.text?.toLowerCase().includes(search.toLowerCase()))
+    n.blocks?.some(b => stripHtml(b.text || '').toLowerCase().includes(search.toLowerCase()))
   );
 
   const selected = notes.find(n => n.id === selectedId);
@@ -785,8 +868,7 @@ export default function Setups() {
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, color: 'var(--text3)', padding: 32, textAlign: 'center' }}>
               <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--text3)', opacity: 0.45 }}>
                 <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-                <path d="M14 2v6h6"/>
-                <path d="M8 13h8M8 17h6M8 9h2"/>
+                <path d="M14 2v6h6"/><path d="M8 13h8M8 17h6M8 9h2"/>
               </svg>
               <div>
                 <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>Your trading playbook</div>
@@ -805,7 +887,7 @@ export default function Setups() {
                 </Btn>
               </div>
               <div style={{ fontSize: 11, marginTop: 8 }}>
-                Tip: type <kbd style={{ padding: '2px 6px', background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: 4, fontFamily: 'var(--mono)', fontSize: 10 }}>/</kbd> inside a note to insert blocks
+                Tip: type <kbd style={{ padding: '2px 6px', background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: 4, fontFamily: 'var(--mono)', fontSize: 10 }}>/</kbd> inside a note to insert blocks · <kbd style={{ padding: '2px 6px', background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: 4, fontFamily: 'var(--mono)', fontSize: 10 }}>#</kbd> <kbd style={{ padding: '2px 6px', background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: 4, fontFamily: 'var(--mono)', fontSize: 10 }}>##</kbd> <kbd style={{ padding: '2px 6px', background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: 4, fontFamily: 'var(--mono)', fontSize: 10 }}>-</kbd> for headings/bullets
               </div>
             </div>
           )
