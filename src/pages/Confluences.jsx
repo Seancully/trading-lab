@@ -89,6 +89,7 @@ function CategoryBlock({ cat, onAddItem, onEditItem, onDeleteItem, onEditCatName
         </button>
       </div>
 
+      <div className="cat-card-body">
       {cat.items.length === 0 && (
         <div style={{ fontSize: 12, color: 'var(--text3)', padding: '8px 12px', fontStyle: 'italic' }}>
           No confluences yet — add one below.
@@ -99,8 +100,9 @@ function CategoryBlock({ cat, onAddItem, onEditItem, onDeleteItem, onEditCatName
           usage={usage?.[item.text] || 0} totalTrades={totalTrades}
           onEdit={onEditItem} onDelete={onDeleteItem}/>
       ))}
+      </div>
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+      <div className="cat-card-add" style={{ display: 'flex', gap: 8, marginTop: 10 }}>
         <input className="form-input" placeholder="Add confluence..." value={addingText}
           onChange={e => setAddingText(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') commitAdd(); }}
