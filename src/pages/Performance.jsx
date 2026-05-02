@@ -733,11 +733,12 @@ function GradeBreakdown({ trades, accountFilter }) {
           const wr = Math.round((d.wins / d.count) * 100);
           const avgR = (d.r / d.count).toFixed(2);
           return (
-            <div key={g} style={{
+            <div key={g} className={`grade-card grade-${g.replace('+', 'plus')}`} style={{
               flex: 1, minWidth: 120,
               border: `1.5px solid ${m.border}`,
               background: m.bg, borderRadius: 10, padding: '14px 16px',
               display: 'flex', flexDirection: 'column', gap: 8,
+              '--grade-color': m.color,
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <GradeBadge grade={g} size="lg"/>

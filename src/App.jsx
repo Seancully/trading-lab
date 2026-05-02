@@ -436,6 +436,36 @@ export default function App() {
   const [user, setUser]           = useState(null);
 
   const [page, setPage]           = useState('dashboard');
+  const prevPageRef               = useRef(page);
+  // Direction of last navigation: +1 = right, -1 = left, 0 = first/no slide
+  const [navDirection, setNavDirection] = useState(0);
+
+  // Cursor spotlight — track mouse position globally so the dashboard can
+  // render a soft radial light that follows the cursor.
+  useEffect(() => {
+    let raf;
+    const onMove = (e) => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        document.documentElement.style.setProperty('--cursor-x', e.clientX + 'px');
+        document.documentElement.style.setProperty('--cursor-y', e.clientY + 'px');
+      });
+    };
+    window.addEventListener('mousemove', onMove, { passive: true });
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('mousemove', onMove); };
+  }, []);
+
+  // Wrapper that triggers slide direction based on NAV order
+  const handlePageChange = (next) => {
+    setPage((current) => {
+      if (current === next) return current;
+      const order = NAV.map(n => n.id);
+      const ci = order.indexOf(current), ni = order.indexOf(next);
+      setNavDirection(ni > ci ? 1 : -1);
+      prevPageRef.current = current;
+      return next;
+    });
+  };
   const [theme, setTheme]         = useState(() => Store.getSettings().theme || 'dark');
   const [showSettings, setShowSettings] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -518,7 +548,7 @@ export default function App() {
   }, []);
 
   const paletteItems = useMemo(() => [
-    ...NAV.map(n => ({ id: 'nav-' + n.id, label: 'Go to ' + n.label, group: 'Navigate', icon: n.icon, run: () => setPage(n.id) })),
+    ...NAV.map(n => ({ id: 'nav-' + n.id, label: 'Go to ' + n.label, group: 'Navigate', icon: n.icon, run: () => handlePageChange(n.id) })),
     { id: 'new-trade',  label: 'Log new trade',         group: 'Actions', icon: 'plus',     kbd: 'N', run: () => { setPage('journal'); setTimeout(() => window.dispatchEvent(new CustomEvent('tl:newTrade')), 50); } },
     { id: 'new-setup',  label: 'New note',              group: 'Actions', icon: 'plus',     run: () => { setPage('setups');  setTimeout(() => window.dispatchEvent(new CustomEvent('tl:newSetup')), 50); } },
     { id: 'new-review', label: 'New weekly review',     group: 'Actions', icon: 'journal',  run: () => {
@@ -638,7 +668,7 @@ export default function App() {
             <button
               key={item.id}
               className={`nav-item ${page === item.id ? 'active' : ''}`}
-              onClick={() => setPage(item.id)}
+              onClick={() => handlePageChange(item.id)}
             >
               <Icon name={item.icon} size={14}/>
               <span className="label">{item.label}</span>
@@ -662,8 +692,8 @@ export default function App() {
         </div>
 
         <ErrorBoundary key={page}>
-        <div className="main-content page-transition" data-page={page}>
-          {page === 'dashboard'   && <Dashboard onNav={setPage} accountFilter={accountFilter}/>}
+        <div className="main-content page-transition" data-page={page} data-dir={navDirection}>
+          {page === 'dashboard'   && <Dashboard onNav={handlePageChange} accountFilter={accountFilter}/>}
           {page === 'journal'     && (
             <Journal
               rules={rules}
