@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Store, effectivePnl } from '../lib/store.js';
 import { calcStats } from '../lib/stats.js';
-import { Tabs, StatCard, Empty, Icon, Badge, DirBadge, PnlText, Btn } from '../components/Shared.jsx';
+import { Tabs, StatCard, Empty, Icon, Badge, DirBadge, PnlText, Btn, GradeBadge, GRADES, GRADE_META } from '../components/Shared.jsx';
 import { toast } from '../lib/toast.js';
 
 // ── Equity curve canvas ───────────────────────────────────────────────────────
@@ -693,6 +693,89 @@ function MostSkippedRules({ trades }) {
   );
 }
 
+// ── Grade breakdown ───────────────────────────────────────────────────────────
+function GradeBreakdown({ trades, accountFilter }) {
+  const data = useMemo(() => {
+    const out = {};
+    for (const g of GRADES) out[g] = { count: 0, wins: 0, losses: 0, bes: 0, pnl: 0, r: 0 };
+    for (const t of trades) {
+      const g = t.grade;
+      if (!g || !out[g]) continue;
+      out[g].count++;
+      out[g].pnl += effectivePnl(t, accountFilter);
+      out[g].r   += Number(t.rMultiple) || 0;
+      if (t.result === 'Win')  out[g].wins++;
+      else if (t.result === 'Loss') out[g].losses++;
+      else out[g].bes++;
+    }
+    return out;
+  }, [trades, accountFilter]);
+
+  const totalGraded = GRADES.reduce((s, g) => s + data[g].count, 0);
+  const totalTrades = trades.length;
+  const gradedPct = totalTrades ? Math.round((totalGraded / totalTrades) * 100) : 0;
+
+  if (!totalGraded) return (
+    <div style={{ color: 'var(--text3)', fontSize: 12, padding: '24px 4px', textAlign: 'center' }}>
+      No graded trades yet. Open any trade card → Review tab to assign a grade, or hover a card for the quick-grade bar.
+    </div>
+  );
+
+  const fmtPnl = (v) => `${v >= 0 ? '+' : ''}$${Math.abs(Math.round(v)).toLocaleString()}`;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+        {GRADES.map(g => {
+          const d = data[g];
+          if (!d.count) return null;
+          const m = GRADE_META[g];
+          const wr = Math.round((d.wins / d.count) * 100);
+          const avgR = (d.r / d.count).toFixed(2);
+          return (
+            <div key={g} style={{
+              flex: 1, minWidth: 120,
+              border: `1.5px solid ${m.border}`,
+              background: m.bg, borderRadius: 10, padding: '14px 16px',
+              display: 'flex', flexDirection: 'column', gap: 8,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <GradeBadge grade={g} size="lg"/>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text3)' }}>{d.count}T</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                <div>
+                  <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text3)', marginBottom: 2 }}>Win Rate</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 15,
+                    color: wr >= 50 ? 'var(--bull)' : 'var(--bear)' }}>{wr}%</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text3)', marginBottom: 2 }}>Avg R</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 15,
+                    color: Number(avgR) >= 0 ? 'var(--bull)' : 'var(--bear)' }}>
+                    {Number(avgR) > 0 ? '+' : ''}{avgR}R
+                  </div>
+                </div>
+                <div style={{ gridColumn: 'span 2' }}>
+                  <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text3)', marginBottom: 2 }}>Total P&L</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 15,
+                    color: d.pnl >= 0 ? 'var(--bull)' : 'var(--bear)' }}>{fmtPnl(d.pnl)}</div>
+                </div>
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
+                {d.wins}W · {d.losses}L{d.bes > 0 ? ` · ${d.bes}BE` : ''}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'right' }}>
+        {totalGraded} of {totalTrades} trades graded ({gradedPct}%)
+      </div>
+    </div>
+  );
+}
+
 // ── Performance main ──────────────────────────────────────────────────────────
 export default function Performance({ accountFilter }) {
   const [allTrades] = useState(() => Store.getTrades());
@@ -770,6 +853,11 @@ export default function Performance({ accountFilter }) {
               <div className="card-title">Entry Model Breakdown</div>
               <ModelBreakdown trades={filtered} accountFilter={accountFilter}/>
             </div>
+          </div>
+
+          <div className="card" style={{ marginTop: 16 }}>
+            <div className="card-title">Grade Breakdown — Execution Quality</div>
+            <GradeBreakdown trades={filtered} accountFilter={accountFilter}/>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16, marginTop: 16 }}>

@@ -3,7 +3,7 @@ import { Store, effectivePnl } from '../lib/store.js';
 import { toast } from '../lib/toast.js';
 import {
   Icon, Badge, DirBadge, PnlText, RText, Modal, Btn, Tabs, Sep, Empty, Chip,
-  FInput, FSelect, FTextarea,
+  FInput, FSelect, FTextarea, GradeBadge, GRADES, GRADE_META,
 } from '../components/Shared.jsx';
 import Lightbox from '../components/Lightbox.jsx';
 
@@ -48,9 +48,9 @@ const ENTRY_MODELS = [
 
 const SESSIONS = ['London', 'NY AM Kill Zone', 'NY Lunch', 'NY PM', 'Asia', 'Other'];
 
-function TradeCard({ trade, onClick, onDelete, accountFilter, draggable, isDragging, isDragOver, onDragStart, onDragOver, onDrop, onDragEnd }) {
+function TradeCard({ trade, onClick, onDelete, onGrade, accountFilter, draggable, isDragging, isDragOver, onDragStart, onDragOver, onDrop, onDragEnd }) {
   const { date, time, instrument, direction, result, rMultiple, screenshotUrl, entryModel, accounts } = trade;
-  // Account label respects the filter — only the in-scope ones, with their contract counts.
+  const [hovered, setHovered] = useState(false);
   const inScope = accountFilter == null
     ? (accounts || [])
     : (accounts || []).filter(a => accountFilter.includes(a.name));
@@ -68,6 +68,8 @@ function TradeCard({ trade, onClick, onDelete, accountFilter, draggable, isDragg
     <div
       className={`trade-card ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
       onClick={() => onClick(trade)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       draggable={!!draggable}
       onDragStart={(e) => onDragStart?.(e, trade.id)}
       onDragOver={(e) => onDragOver?.(e, trade.id)}
@@ -103,6 +105,7 @@ function TradeCard({ trade, onClick, onDelete, accountFilter, draggable, isDragg
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <DirBadge dir={direction}/>
           <Badge result={result}/>
+          {trade.grade && <GradeBadge grade={trade.grade}/>}
           <span style={{ flex: 1 }}/>
           <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600 }}>{instrument}</span>
         </div>
@@ -113,6 +116,38 @@ function TradeCard({ trade, onClick, onDelete, accountFilter, draggable, isDragg
           <RText value={rMultiple}/>
         </div>
         <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{accountLabel}</div>
+      </div>
+
+      {/* Quick-grade bar — appears on hover, no modal needed */}
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          display: 'flex', gap: 4, padding: '8px 12px',
+          borderTop: '1px solid var(--border)',
+          opacity: hovered ? 1 : 0,
+          transition: 'opacity 0.15s',
+          pointerEvents: hovered ? 'auto' : 'none',
+        }}
+      >
+        {GRADES.map(g => {
+          const m = GRADE_META[g];
+          const active = trade.grade === g;
+          return (
+            <button key={g}
+              title={`${g} — ${m.label}`}
+              onClick={() => onGrade?.(trade.id, active ? null : g)}
+              style={{
+                flex: 1, padding: '5px 2px', borderRadius: 5,
+                border: `1px solid ${active ? m.border : 'var(--border2)'}`,
+                background: active ? m.bg : 'transparent',
+                color: active ? m.color : 'var(--text3)',
+                fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 11,
+                cursor: 'pointer', transition: 'all 0.1s',
+              }}>
+              {g}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -155,6 +190,8 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
     rulesScore: 0,
     review: '',
     lesson: '',
+    grade: null,
+    gradeNote: '',
     screenshotUrl: null,
     outlook: { mnqImageUrl: null, mesImageUrl: null, notes: '' },
   };
@@ -422,7 +459,43 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
         )}
 
         {tab === 'Review' && (
-          <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+          {/* ── Execution grade ── */}
+          <div>
+            <label className="form-label">Execution Grade</label>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              {GRADES.map(g => {
+                const m = GRADE_META[g];
+                const active = trade.grade === g;
+                return (
+                  <button key={g} onClick={() => set('grade', active ? null : g)}
+                    style={{
+                      flex: 1, padding: '10px 4px', borderRadius: 8,
+                      border: `1.5px solid ${active ? m.border : 'var(--border2)'}`,
+                      background: active ? m.bg : 'transparent',
+                      color: active ? m.color : 'var(--text3)',
+                      fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 15,
+                      cursor: 'pointer', transition: 'all 0.15s',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                    }}>
+                    {g}
+                    <span style={{ fontSize: 9, fontWeight: 500, fontFamily: 'var(--font)',
+                      opacity: active ? 0.85 : 0.5, letterSpacing: '0.02em' }}>
+                      {m.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {trade.grade && (
+            <FInput label="Execution note (optional)"
+              value={trade.gradeNote || ''} onChange={v => set('gradeNote', v)}
+              placeholder={`Why ${trade.grade}? e.g. "Entered 2 ticks past the level"`}/>
+          )}
+
           <FTextarea label="Trade Review — What happened?" value={trade.review} onChange={v => set('review', v)}
             placeholder="Describe the trade: what you saw, how you entered, how it played out..." rows={5}/>
           <FTextarea label="Lesson / Key Takeaway" value={trade.lesson} onChange={v => set('lesson', v)}
@@ -490,12 +563,13 @@ export default function Journal({ rules, settings, openTradeId, onOpenHandled, a
   const [sessionFilter, setSessionFilter] = useState([]);
   const [instrumentFilter, setInstrumentFilter] = useState([]);
   const [confluenceFilter, setConfluenceFilter] = useState([]);
+  const [gradeFilter, setGradeFilter] = useState([]);
 
   const toggleFromArray = (arr, setArr, val) => {
     setArr(arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val]);
   };
   const clearAllFilters = () => {
-    setSetupFilter([]); setSessionFilter([]); setInstrumentFilter([]); setConfluenceFilter([]);
+    setSetupFilter([]); setSessionFilter([]); setInstrumentFilter([]); setConfluenceFilter([]); setGradeFilter([]);
   };
 
   // Distinct option lists pulled from logged trades. Sorted alphabetically so
@@ -517,7 +591,7 @@ export default function Journal({ rules, settings, openTradeId, onOpenHandled, a
     };
   }, [trades]);
 
-  const activeFilterCount = setupFilter.length + sessionFilter.length + instrumentFilter.length + confluenceFilter.length;
+  const activeFilterCount = setupFilter.length + sessionFilter.length + instrumentFilter.length + confluenceFilter.length + gradeFilter.length;
   const [draggingId, setDraggingId] = useState(null);
   const [dragOverId, setDragOverId] = useState(null);
 
@@ -544,6 +618,11 @@ export default function Journal({ rules, settings, openTradeId, onOpenHandled, a
     setTrades(Store.deleteTrade(id));
     toast.info('Trade deleted');
   };
+  const handleGrade = (id, grade) => {
+    const t = trades.find(t => t.id === id);
+    if (!t) return;
+    setTrades(Store.saveTrade({ ...t, grade: grade || null }));
+  };
 
   let visible = [...trades];
   if (accountFilter != null) {
@@ -556,6 +635,9 @@ export default function Journal({ rules, settings, openTradeId, onOpenHandled, a
   if (instrumentFilter.length) visible = visible.filter(t => instrumentFilter.includes(t.instrument));
   if (confluenceFilter.length) visible = visible.filter(t =>
     (t.confluences || []).some(c => confluenceFilter.includes(c))
+  );
+  if (gradeFilter.length) visible = visible.filter(t =>
+    gradeFilter.includes(t.grade || 'Ungraded')
   );
   if (search) {
     const q = search.toLowerCase();
@@ -636,7 +718,8 @@ export default function Journal({ rules, settings, openTradeId, onOpenHandled, a
 
       {showFilters && (
         <div className="card" style={{ padding: '14px 16px', marginBottom: 16 }}>
-          <FilterChipGroup label="Setup"      options={filterOptions.setups}       selected={setupFilter}      onToggle={(v) => toggleFromArray(setupFilter, setSetupFilter, v)}/>
+          <FilterChipGroup label="Grade"      options={[...GRADES, 'Ungraded']}     selected={gradeFilter}      onToggle={(v) => toggleFromArray(gradeFilter, setGradeFilter, v)}/>
+          <FilterChipGroup label="Setup"      options={filterOptions.setups}        selected={setupFilter}      onToggle={(v) => toggleFromArray(setupFilter, setSetupFilter, v)}/>
           <FilterChipGroup label="Session"    options={filterOptions.sessions}      selected={sessionFilter}    onToggle={(v) => toggleFromArray(sessionFilter, setSessionFilter, v)}/>
           <FilterChipGroup label="Instrument" options={filterOptions.instruments}   selected={instrumentFilter} onToggle={(v) => toggleFromArray(instrumentFilter, setInstrumentFilter, v)}/>
           <FilterChipGroup label="Confluence" options={filterOptions.confluences}   selected={confluenceFilter} onToggle={(v) => toggleFromArray(confluenceFilter, setConfluenceFilter, v)}/>
@@ -676,7 +759,7 @@ export default function Journal({ rules, settings, openTradeId, onOpenHandled, a
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
           {visible.map(t => (
             <TradeCard
-              key={t.id} trade={t} onClick={setSelected} onDelete={handleDelete}
+              key={t.id} trade={t} onClick={setSelected} onDelete={handleDelete} onGrade={handleGrade}
               accountFilter={accountFilter}
               draggable
               isDragging={draggingId === t.id}

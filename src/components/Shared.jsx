@@ -43,6 +43,30 @@ export function Badge({ result }) {
   return <span className={`badge ${cls}`}>{result}</span>;
 }
 
+// ── Trade grading ────────────────────────────────────────────────────────────
+export const GRADES = ['A+', 'A', 'B', 'C', 'D'];
+export const GRADE_META = {
+  'A+': { color: '#fbbf24', bg: 'rgba(251,191,36,0.14)', border: 'rgba(251,191,36,0.35)', label: 'Elite'      },
+  'A':  { color: '#22c55e', bg: 'rgba(34,197,94,0.12)',  border: 'rgba(34,197,94,0.30)',  label: 'Great'      },
+  'B':  { color: '#60a5fa', bg: 'rgba(96,165,250,0.12)', border: 'rgba(96,165,250,0.30)', label: 'Solid'      },
+  'C':  { color: '#f97316', bg: 'rgba(249,115,22,0.12)', border: 'rgba(249,115,22,0.30)', label: 'Borderline' },
+  'D':  { color: '#f43f5e', bg: 'rgba(244,63,94,0.12)',  border: 'rgba(244,63,94,0.30)',  label: 'Mistake'    },
+};
+export function GradeBadge({ grade, size = 'sm' }) {
+  if (!grade) return null;
+  const m = GRADE_META[grade] || {};
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      padding: size === 'lg' ? '3px 12px' : '1px 6px',
+      borderRadius: 4, fontSize: size === 'lg' ? 13 : 11,
+      fontWeight: 700, fontFamily: 'var(--mono)',
+      color: m.color, background: m.bg, border: `1px solid ${m.border}`,
+      letterSpacing: '0.02em',
+    }}>{grade}</span>
+  );
+}
+
 export function DirBadge({ dir }) {
   const style = {
     display: 'inline-flex', alignItems: 'center', gap: 4,
