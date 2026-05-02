@@ -75,14 +75,18 @@ html, body, #root {
 }
 body {
   background:
-    radial-gradient(1200px 520px at 8% -15%, rgba(122,162,247,0.16), transparent 70%),
-    radial-gradient(900px 480px at 92% -10%, rgba(212,165,116,0.14), transparent 70%),
+    /* Upper-left — accent blue, sits behind top-row cards */
+    radial-gradient(900px 700px at 8% 38%, rgba(122,162,247,0.14), transparent 65%),
+    /* Lower-right — warm gold, sits behind equity/P&L area */
+    radial-gradient(750px 600px at 88% 72%, rgba(212,165,116,0.11), transparent 65%),
+    /* Centre-bottom — green, tints performance / equity curve cards */
+    radial-gradient(600px 500px at 52% 82%, rgba(34,197,94,0.07), transparent 65%),
     var(--bg);
 }
 body.light {
   background:
-    radial-gradient(1200px 520px at 8% -15%, rgba(122,162,247,0.12), transparent 70%),
-    radial-gradient(900px 480px at 92% -10%, rgba(122,162,247,0.08), transparent 70%),
+    radial-gradient(900px 700px at 8% 38%, rgba(122,162,247,0.10), transparent 65%),
+    radial-gradient(750px 600px at 88% 72%, rgba(122,162,247,0.07), transparent 65%),
     var(--bg);
 }
 /* Lock horizontal scroll. The app is column-oriented; any side-scroll is
@@ -279,11 +283,30 @@ button, input, select, textarea { font-family: inherit; }
 }
 
 /* ── Cards ──────────────────────────────────────────────────────────────── */
+/* ── Per-card coloured glow ─────────────────────────────────────────────── */
+/* Wrap any .card with this to add a coloured ambient blob behind it.
+   The card's backdrop-filter picks up the colour through the glass.
+   Set --card-glow to the desired rgba colour. */
+.card-glow-wrap {
+  position: relative;
+  isolation: isolate;
+}
+.card-glow-wrap::before {
+  content: '';
+  position: absolute;
+  inset: -28px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 60%, var(--card-glow, rgba(122,162,247,0.22)), transparent 68%);
+  filter: blur(22px);
+  z-index: -1;
+  pointer-events: none;
+}
+
 .card {
   background: var(--glass-bg); border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg); padding: 20px;
-  backdrop-filter: blur(14px) saturate(135%);
-  -webkit-backdrop-filter: blur(14px) saturate(135%);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
   transition: border-color 0.18s, transform 0.18s, box-shadow 0.18s;
 }
 .card:hover { border-color: var(--glass-border-strong); }
@@ -428,8 +451,9 @@ button, input, select, textarea { font-family: inherit; }
   background: var(--glass-bg); border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg); padding: 16px 18px;
   display: flex; flex-direction: column; gap: 5px;
-  backdrop-filter: blur(14px) saturate(135%);
-  -webkit-backdrop-filter: blur(14px) saturate(135%);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  box-shadow: 0 1px 0 var(--glass-highlight) inset;
   transition: border-color 0.18s, transform 0.18s;
 }
 .stat-card:hover { border-color: var(--glass-border-strong); transform: translateY(-1px); }
@@ -636,33 +660,35 @@ body.light .form-select option { background: #ffffff; color: #0A0A0C; }
 /* ── Dashboard welcome ──────────────────────────────────────────────────── */
 .welcome-bar {
   position: relative;
-  background:
-    radial-gradient(120% 140% at 0% 0%, var(--accentDim) 0%, transparent 55%),
-    linear-gradient(135deg, var(--surface) 0%, var(--surface) 60%, var(--bg2) 100%);
-  border: 1px solid var(--border);
+  isolation: isolate;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg); padding: 22px 26px; margin-bottom: 18px;
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
   flex-wrap: wrap;
-  overflow: hidden;
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.03) inset,
-    0 8px 24px -14px rgba(0, 0, 0, 0.5);
+    0 1px 0 var(--glass-highlight) inset,
+    0 12px 32px -14px rgba(0, 0, 0, 0.5);
 }
+/* Accent glow behind the welcome card */
 .welcome-bar::before {
   content: '';
   position: absolute;
-  top: -40%; right: -10%;
-  width: 320px; height: 320px;
-  background: radial-gradient(circle, var(--accentDim) 0%, transparent 70%);
-  opacity: 0.5;
+  inset: -30px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 30% 50%, rgba(122,162,247,0.20), transparent 65%);
+  filter: blur(24px);
+  z-index: -1;
   pointer-events: none;
 }
-.welcome-bar > * { position: relative; z-index: 1; }
-[data-theme="light"] .welcome-bar {
-  background:
-    radial-gradient(120% 140% at 0% 0%, var(--accentDim) 0%, transparent 55%),
-    linear-gradient(135deg, var(--surface) 0%, var(--bg2) 100%);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 6px 16px -8px rgba(15, 23, 42, 0.14);
+/* Top glass highlight line */
+.welcome-bar::after {
+  content: '';
+  position: absolute; top: 0; left: 10%; right: 10%; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--glass-highlight) 50%, transparent);
+  pointer-events: none;
 }
 
 /* ── Animations ─────────────────────────────────────────────────────────── */
