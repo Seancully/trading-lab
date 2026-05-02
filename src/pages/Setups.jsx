@@ -816,7 +816,9 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
           contentEditable suppressContentEditableWarning
           data-placeholder={titleFocused ? 'Untitled' : ''}
           style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-0.025em', outline: 'none',
-            color: 'var(--text)', lineHeight: 1.2, marginBottom: 14, minHeight: '1.2em', display: 'block' }}
+            color: note.titleColor || 'var(--text)',
+            textTransform: note.titleTransform || 'none',
+            lineHeight: 1.2, marginBottom: 14, minHeight: '1.2em', display: 'block' }}
           onInput={e => setTitle(e.target.innerText || '')}
           onFocus={() => setTitleFocused(true)}
           onBlur={() => setTitleFocused(false)}

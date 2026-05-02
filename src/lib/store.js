@@ -719,22 +719,20 @@ export const Store = {
 
     const blocks = [
       { id: uid(), type: 'p',   text: statsHtml },
-      { id: uid(), type: 'bq',  text: 'Fill this in with Claude: hit "Copy week for Claude" on the Performance tab (or use the toast below — it\'s already on your clipboard). Paste it into a chat with Claude, attach a screenshot of each trade card from the Journal, and ask Claude to help you draft the sections below. Then refine in your own words.' },
-      { id: uid(), type: 'h2',  text: 'The numbers' },
+      { id: uid(), type: 'h2',  text: 'THE NUMBERS' },
       { id: uid(), type: 'li',  text: `Total P&L: ${fmt(totalPnl)}` },
       { id: uid(), type: 'li',  text: `Best day: ${fmt(bestDay)} · Worst day: ${fmt(worstDay)}` },
       { id: uid(), type: 'li',  text: `Top models: ${topModels.length ? topModels.map(([m, c]) => `${m} (${c})`).join(', ') : '—'}` },
-      { id: uid(), type: 'h2',  text: 'What worked' },
+      { id: uid(), type: 'h2',  text: '<span style="color:#22c55e">WHAT WORKED</span>' },
       { id: uid(), type: 'p',   text: '' },
-      { id: uid(), type: 'h2',  text: 'What didn\'t' },
+      { id: uid(), type: 'h2',  text: '<span style="color:#f43f5e">WHAT DIDN\'T</span>' },
       { id: uid(), type: 'p',   text: '' },
-      { id: uid(), type: 'h2',  text: 'Lessons' },
+      { id: uid(), type: 'h2',  text: 'LESSONS' },
       { id: uid(), type: 'li',  text: '' },
       { id: uid(), type: 'li',  text: '' },
-      { id: uid(), type: 'h2',  text: 'Adjustments for next week' },
+      { id: uid(), type: 'h2',  text: 'ADJUSTMENTS FOR NEXT WEEK' },
       { id: uid(), type: 'li',  text: '' },
-      { id: uid(), type: 'h2',  text: 'Most-skipped rules' },
-      { id: uid(), type: 'p',   text: 'Fix these:' },
+      { id: uid(), type: 'h2',  text: 'MOST-SKIPPED RULES' },
       ...(topSkipped.length
         ? topSkipped.map(({ rule, skipped: count }) => ({
             id: uid(), type: 'li',
@@ -743,13 +741,14 @@ export const Store = {
         : [{ id: uid(), type: 'li', text: scoredTrades.length === 0
             ? 'No rules-scored trades this week.'
             : 'Clean week — every rule on every trade.' }]),
-      { id: uid(), type: 'bq',  text: 'Did I follow my rules? Where did I deviate, and why?' },
     ];
 
     const note = {
       id: uid(),
       emoji: '📊',
       title: `Weekly review · ${monthName} – ${endName}`,
+      titleColor: 'var(--accent)',
+      titleTransform: 'uppercase',
       tags: ['Review', 'Weekly'],
       blocks,
       createdAt: new Date().toISOString(),
