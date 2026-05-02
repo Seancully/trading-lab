@@ -112,6 +112,7 @@ function CategoryBlock({ cat, onAddRule, onEditRule, onDeleteRule, onToggleRequi
         </button>
       </div>
 
+      <div className="cat-card-body">
       {cat.rules.length === 0 && (
         <div style={{ fontSize: 12, color: 'var(--text3)', padding: '8px 12px', fontStyle: 'italic' }}>
           No rules yet — add one below.
@@ -122,8 +123,9 @@ function CategoryBlock({ cat, onAddRule, onEditRule, onDeleteRule, onToggleRequi
           stat={ruleStats?.[rule.id]}
           onEdit={onEditRule} onDelete={onDeleteRule} onToggleRequired={onToggleRequired}/>
       ))}
+      </div>
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+      <div className="cat-card-add" style={{ display: 'flex', gap: 8, marginTop: 10 }}>
         <input className="form-input" placeholder="Add rule..." value={addingText}
           onChange={e => setAddingText(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') commitAdd(); }}
