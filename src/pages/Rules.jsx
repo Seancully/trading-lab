@@ -25,15 +25,7 @@ function RuleItem({ rule, catId, onToggleRequired, onEdit, onDelete, stat }) {
   };
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 10,
-      padding: '9px 12px', borderRadius: 8,
-      background: 'var(--surface2)', border: '1px solid var(--border)',
-      marginBottom: 6, transition: 'border-color 0.15s',
-    }}
-      onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--border2)'}
-      onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
-    >
+    <div className="cat-row">
       <div title={rule.required ? 'Required rule — click to toggle' : 'Bonus rule — click to toggle'}
         onClick={() => onToggleRequired(catId, rule.id)}
         style={{
@@ -94,16 +86,10 @@ function CategoryBlock({ cat, onAddRule, onEditRule, onDeleteRule, onToggleRequi
   const bonus = cat.rules.filter(r => !r.required).length;
 
   return (
-    <div style={{ marginBottom: 28 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-        <div style={{ width: 3, height: 20, background: 'var(--accent)', borderRadius: 2 }}/>
-        <div style={{
-          width: 26, height: 26, borderRadius: 7,
-          background: 'var(--accentDim)', border: '1px solid var(--accentBorder)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'var(--accent)', flexShrink: 0,
-        }}>
-          <Icon name={iconForCategory(cat.category)} size={13}/>
+    <div className="cat-card">
+      <div className="cat-card-head">
+        <div className="cat-card-icon">
+          <Icon name={iconForCategory(cat.category)} size={14}/>
         </div>
         {editingCat ? (
           <input autoFocus className="form-input" value={catName}
@@ -238,12 +224,14 @@ export default function Rules() {
       {rules.length === 0 ? (
         <Empty icon="📋" title="No rules yet" desc="Add your first category below to define your trading rules."/>
       ) : (
-        rules.map(cat => (
-          <CategoryBlock key={cat.id} cat={cat} ruleStats={ruleStats}
-            onAddRule={addRule} onEditRule={editRule}
-            onDeleteRule={deleteRule} onToggleRequired={toggleRequired}
-            onEditCatName={editCatName} onDeleteCat={deleteCat}/>
-        ))
+        <div className="cat-grid">
+          {rules.map(cat => (
+            <CategoryBlock key={cat.id} cat={cat} ruleStats={ruleStats}
+              onAddRule={addRule} onEditRule={editRule}
+              onDeleteRule={deleteRule} onToggleRequired={toggleRequired}
+              onEditCatName={editCatName} onDeleteCat={deleteCat}/>
+          ))}
+        </div>
       )}
 
       <div style={{
