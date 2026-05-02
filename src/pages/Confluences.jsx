@@ -12,15 +12,7 @@ function Item({ item, catId, onEdit, onDelete, usage, totalTrades }) {
   };
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 10,
-      padding: '9px 12px', borderRadius: 8,
-      background: 'var(--surface2)', border: '1px solid var(--border)',
-      marginBottom: 6, transition: 'border-color 0.15s',
-    }}
-      onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--border2)'}
-      onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
-    >
+    <div className="cat-row">
       <div style={{
         width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
         background: 'var(--accent)',
@@ -71,9 +63,11 @@ function CategoryBlock({ cat, onAddItem, onEditItem, onDeleteItem, onEditCatName
   };
 
   return (
-    <div style={{ marginBottom: 28 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-        <div style={{ width: 3, height: 20, background: 'var(--accent)', borderRadius: 2 }}/>
+    <div className="cat-card">
+      <div className="cat-card-head">
+        <div className="cat-card-icon">
+          <Icon name="rules" size={14}/>
+        </div>
         {editingCat ? (
           <input autoFocus className="form-input" value={catName}
             onChange={e => setCatName(e.target.value)}
@@ -183,13 +177,15 @@ export default function Confluences() {
       {cnf.length === 0 ? (
         <Empty icon="✓" title="No confluences yet" desc="Add your first category below."/>
       ) : (
-        cnf.map(cat => (
-          <CategoryBlock key={cat.id} cat={cat}
-            usage={usage} totalTrades={totalTrades}
-            onAddItem={addItem} onEditItem={editItem}
-            onDeleteItem={deleteItem}
-            onEditCatName={editCatName} onDeleteCat={deleteCat}/>
-        ))
+        <div className="cat-grid">
+          {cnf.map(cat => (
+            <CategoryBlock key={cat.id} cat={cat}
+              usage={usage} totalTrades={totalTrades}
+              onAddItem={addItem} onEditItem={editItem}
+              onDeleteItem={deleteItem}
+              onEditCatName={editCatName} onDeleteCat={deleteCat}/>
+          ))}
+        </div>
       )}
 
       <div style={{

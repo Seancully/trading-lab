@@ -302,8 +302,8 @@ export function CalendarView({ byDay, trades = [], accountFilter = null }) {
   };
 
   return (
-    <div>
-      <div className="card" style={{ padding: '14px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+    <div className="calendar-view">
+      <div className="card calendar-header-card" style={{ padding: '14px 18px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         <button
           onClick={() => setCurrent(c => { const d = new Date(c.year, c.month - 1); return { year: d.getFullYear(), month: d.getMonth() }; })}
           style={{ background: 'none', border: '1px solid var(--border2)', color: 'var(--text2)', cursor: 'pointer', borderRadius: 6, padding: '6px 10px', display: 'flex' }}
@@ -328,14 +328,15 @@ export function CalendarView({ byDay, trades = [], accountFilter = null }) {
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4, marginBottom: 4 }}>
+      <div className="calendar-headers" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6, marginBottom: 6 }}>
         {dayHeaders.map(d => (
           <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text3)', padding: '4px 0' }}>{d}</div>
         ))}
       </div>
 
+      <div className="calendar-weeks">
       {weeks.map((week, wi) => (
-        <div key={wi} style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4, marginBottom: 4 }}>
+        <div key={wi} className="calendar-week" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
           {week.map(({ date, day, inMonth, pnl }) => {
             const dayTrades = tradesByDay[date] || [];
             const hasTrade = dayTrades.length > 0;
@@ -363,7 +364,7 @@ export function CalendarView({ byDay, trades = [], accountFilter = null }) {
                 style={{
                   background: inMonth ? bg : 'transparent',
                   border: `1px solid ${isToday ? 'var(--accentBorder)' : hasTrade && inMonth ? 'transparent' : 'var(--border)'}`,
-                  borderRadius: 8, padding: '8px 6px', minHeight: 58,
+                  borderRadius: 10, padding: '10px 8px',
                   opacity: inMonth ? 1 : 0.3,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                   transition: 'opacity 0.15s',
@@ -376,9 +377,9 @@ export function CalendarView({ byDay, trades = [], accountFilter = null }) {
                   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedDay({ date, trades: dayTrades }); }
                 }}
               >
-                <div style={{ fontSize: 11, color: isToday ? 'var(--accent)' : 'var(--text2)', fontWeight: isToday ? 700 : 500, marginBottom: 4 }}>{day}</div>
+                <div className="cal-day-num" style={{ color: isToday ? 'var(--accent)' : 'var(--text2)', fontWeight: isToday ? 700 : 500 }}>{day}</div>
                 {hasTrade && inMonth ? (
-                  <div style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 700, color: pnlColor }}>
+                  <div className="cal-pnl" style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: pnlColor }}>
                     {pnl > 0 ? '+' : ''}${Math.round(Math.abs(pnl)).toLocaleString()}
                   </div>
                 ) : inMonth ? (
@@ -392,6 +393,7 @@ export function CalendarView({ byDay, trades = [], accountFilter = null }) {
           })}
         </div>
       ))}
+      </div>
 
       {selectedDay && (
         <>
