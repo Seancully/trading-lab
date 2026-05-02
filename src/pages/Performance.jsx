@@ -816,42 +816,52 @@ export default function Performance({ accountFilter }) {
       {tab === 'Overview' && (
         <div>
           <div style={{ marginBottom: 8, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text3)' }}>P&L · Outcome</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginBottom: 18 }}>
-            <StatCard label="Total P&L"
-              value={<span style={{ color: stats.totalPnl >= 0 ? 'var(--bull)' : 'var(--bear)' }}>{fmtPnl(stats.totalPnl)}</span>}/>
-            <StatCard label="Win Rate" value={`${stats.winRate}%`}
-              sub={`${stats.wins}W · ${stats.losses}L · ${stats.bes}BE`}/>
-            <StatCard label="Profit Factor" value={stats.profitFactor}
-              sub={`G.Win $${Math.round(stats.grossWin)} / G.Loss $${Math.round(stats.grossLoss)}`}/>
-            <StatCard label="Avg R Won" value={<span style={{ color: 'var(--bull)' }}>+{stats.avgRWin}R</span>}
-              sub={`Avg R Lost: ${stats.avgRLoss}R`}/>
+          {/* Green glow behind the whole P&L row — colour comes through the glass */}
+          <div className="card-glow-wrap" style={{ '--card-glow': stats.totalPnl >= 0 ? 'rgba(34,197,94,0.36)' : 'rgba(244,63,94,0.36)', marginBottom: 18 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+              <StatCard label="Total P&L"
+                value={<span style={{ color: stats.totalPnl >= 0 ? 'var(--bull)' : 'var(--bear)' }}>{fmtPnl(stats.totalPnl)}</span>}/>
+              <StatCard label="Win Rate" value={`${stats.winRate}%`}
+                sub={`${stats.wins}W · ${stats.losses}L · ${stats.bes}BE`}/>
+              <StatCard label="Profit Factor" value={stats.profitFactor}
+                sub={`G.Win $${Math.round(stats.grossWin)} / G.Loss $${Math.round(stats.grossLoss)}`}/>
+              <StatCard label="Avg R Won" value={<span style={{ color: 'var(--bull)' }}>+{stats.avgRWin}R</span>}
+                sub={`Avg R Lost: ${stats.avgRLoss}R`}/>
+            </div>
           </div>
 
           <div style={{ marginBottom: 8, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--text3)' }}>Risk · Discipline</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
-            <StatCard label="Max Drawdown" value={<span style={{ color: 'var(--bear)' }}>-${Math.round(stats.maxDD)}</span>}/>
-            <StatCard label="Best Day" value={<span style={{ color: 'var(--bull)' }}>{fmtPnl(stats.bestDay)}</span>}
-              sub={`Worst: ${fmtPnl(stats.worstDay)}`}/>
-            <StatCard label="Rules Score" value={stats.avgRulesScore !== null ? `${stats.avgRulesScore}%` : '—'}
-              color={stats.avgRulesScore >= 80 ? 'var(--bull)' : stats.avgRulesScore >= 60 ? 'var(--accent)' : 'var(--bear)'}/>
-            <StatCard label="Current Streak"
-              value={<span style={{ color: stats.streakType === 'Win' ? 'var(--bull)' : stats.streakType === 'Loss' ? 'var(--bear)' : 'var(--be)' }}>
-                {stats.streak} {stats.streakType}
-              </span>}/>
+          {/* Red/green glow behind discipline row */}
+          <div className="card-glow-wrap" style={{ '--card-glow': 'rgba(244,63,94,0.28)', marginBottom: 20 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
+              <StatCard label="Max Drawdown" value={<span style={{ color: 'var(--bear)' }}>-${Math.round(stats.maxDD)}</span>}/>
+              <StatCard label="Best Day" value={<span style={{ color: 'var(--bull)' }}>{fmtPnl(stats.bestDay)}</span>}
+                sub={`Worst: ${fmtPnl(stats.worstDay)}`}/>
+              <StatCard label="Rules Score" value={stats.avgRulesScore !== null ? `${stats.avgRulesScore}%` : '—'}
+                color={stats.avgRulesScore >= 80 ? 'var(--bull)' : stats.avgRulesScore >= 60 ? 'var(--accent)' : 'var(--bear)'}/>
+              <StatCard label="Current Streak"
+                value={<span style={{ color: stats.streakType === 'Win' ? 'var(--bull)' : stats.streakType === 'Loss' ? 'var(--bear)' : 'var(--be)' }}>
+                  {stats.streak} {stats.streakType}
+                </span>}/>
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(280px, 1fr)', gap: 16 }} className="perf-equity-models">
-            <EquityCard
-              title="Equity Curve"
-              equity={stats.equity}
-              height={240}
-              totalPnl={stats.totalPnl}
-              maxDD={stats.maxDD}
-              empty={<div style={{ color: 'var(--text3)', fontSize: 12, padding: 20 }}>Need 2+ trades</div>}
-            />
-            <div className="card">
-              <div className="card-title">Entry Model Breakdown</div>
-              <ModelBreakdown trades={filtered} accountFilter={accountFilter}/>
+            <div className="card-glow-wrap" style={{ '--card-glow': stats.totalPnl >= 0 ? 'rgba(34,197,94,0.32)' : 'rgba(244,63,94,0.32)' }}>
+              <EquityCard
+                title="Equity Curve"
+                equity={stats.equity}
+                height={240}
+                totalPnl={stats.totalPnl}
+                maxDD={stats.maxDD}
+                empty={<div style={{ color: 'var(--text3)', fontSize: 12, padding: 20 }}>Need 2+ trades</div>}
+              />
+            </div>
+            <div className="card-glow-wrap" style={{ '--card-glow': 'rgba(122,162,247,0.28)' }}>
+              <div className="card">
+                <div className="card-title">Entry Model Breakdown</div>
+                <ModelBreakdown trades={filtered} accountFilter={accountFilter}/>
+              </div>
             </div>
           </div>
 

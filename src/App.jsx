@@ -185,9 +185,18 @@ function Dashboard({ onNav, accountFilter }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginBottom: 20 }}>
-        <PnlChip value={todayPnl} scale={1.0}  label={`Today · ${todayTrades.length} trade${todayTrades.length !== 1 ? 's' : ''}`}/>
-        <PnlChip value={weekPnl}  scale={0.6}  label={`This week · ${weekTrades.length} trade${weekTrades.length !== 1 ? 's' : ''}`}/>
-        <PnlChip value={monthPnl} scale={0.25} label={`This month · ${monthTrades.length} trade${monthTrades.length !== 1 ? 's' : ''}`}/>
+        {[
+          { value: todayPnl,  scale: 1.0,  label: `Today · ${todayTrades.length} trade${todayTrades.length !== 1 ? 's' : ''}` },
+          { value: weekPnl,   scale: 0.6,  label: `This week · ${weekTrades.length} trade${weekTrades.length !== 1 ? 's' : ''}` },
+          { value: monthPnl,  scale: 0.25, label: `This month · ${monthTrades.length} trade${monthTrades.length !== 1 ? 's' : ''}` },
+        ].map(({ value, scale, label }) => {
+          const glow = value > 0 ? 'rgba(34,197,94,0.42)' : value < 0 ? 'rgba(244,63,94,0.38)' : 'rgba(148,163,184,0.20)';
+          return (
+            <div key={label} className="card-glow-wrap" style={{ '--card-glow': glow }}>
+              <PnlChip value={value} scale={scale} label={label}/>
+            </div>
+          );
+        })}
       </div>
 
       {stats && (
