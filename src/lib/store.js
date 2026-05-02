@@ -718,7 +718,6 @@ export const Store = {
     ].join('<span style="color:var(--text3);font-weight:600"> · </span>');
 
     const blocks = [
-      { id: uid(), type: 'h1',  text: `Week of ${monthName} – ${endName}` },
       { id: uid(), type: 'p',   text: statsHtml },
       { id: uid(), type: 'bq',  text: 'Fill this in with Claude: hit "Copy week for Claude" on the Performance tab (or use the toast below — it\'s already on your clipboard). Paste it into a chat with Claude, attach a screenshot of each trade card from the Journal, and ask Claude to help you draft the sections below. Then refine in your own words.' },
       { id: uid(), type: 'h2',  text: 'The numbers' },

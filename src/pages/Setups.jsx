@@ -5,6 +5,7 @@ import SelectionToolbar from '../components/SelectionToolbar.jsx';
 
 const BLOCK_TYPES = [
   { type: 'p',       icon: '¶',    label: 'Text',      desc: 'Plain paragraph' },
+  { type: 'todo',    icon: '☐',    label: 'To-do',     desc: 'Checkbox item' },
   { type: 'h1',      icon: 'H1',   label: 'Heading 1', desc: 'Large title' },
   { type: 'h2',      icon: 'H2',   label: 'Heading 2', desc: 'Section header' },
   { type: 'h3',      icon: 'H3',   label: 'Heading 3', desc: 'Subsection' },
@@ -18,7 +19,7 @@ const BLOCK_TYPES = [
   { type: 'code',    icon: '</>',  label: 'Code',      desc: 'Code block' },
   { type: 'hr',      icon: '—',    label: 'Divider',   desc: 'Horizontal rule' },
   { type: 'img',     icon: '🖼',   label: 'Image',     desc: 'Upload image' },
-  { type: 'cols2',  icon: '⬜⬜',  label: '2 Columns', desc: 'Two side-by-side columns' },
+  { type: 'cols2',   icon: '⬜⬜',  label: '2 Columns', desc: 'Two side-by-side columns' },
 ];
 
 // Strip HTML tags for preview / search
@@ -127,6 +128,7 @@ const Block = React.forwardRef(function Block({
   onRemoveBlock,
   onAddBelow,
   onTypeChange,
+  onToggleTodo,
   isFocused,
   isDragOver,
   onFocus,
@@ -249,6 +251,35 @@ const Block = React.forwardRef(function Block({
     );
   }
 
+  if (block.type === 'todo') {
+    return (
+      <div className={`block-row${isDragOver ? ' is-over' : ''}`}>
+        {actionBar}
+        {blockMenu}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, flex: 1, paddingTop: 1 }}>
+          <input
+            type="checkbox"
+            checked={!!block.checked}
+            onChange={() => onToggleTodo?.(block.id)}
+            style={{ marginTop: 4, cursor: 'pointer', accentColor: 'var(--accent)',
+              width: 14, height: 14, flexShrink: 0, borderRadius: 3 }}
+          />
+          <div
+            ref={localRef}
+            contentEditable suppressContentEditableWarning
+            data-placeholder={isFocused ? 'To-do...' : ''}
+            style={{ ...getBlockStyle('p'), flex: 1,
+              textDecoration: block.checked ? 'line-through' : 'none',
+              color: block.checked ? 'var(--text3)' : 'var(--text)',
+              transition: 'color 0.15s, text-decoration 0.15s' }}
+            onInput={onInput} onKeyDown={onKeyDown}
+            onFocus={onFocus} onBlur={onBlur}
+          />
+        </div>
+      </div>
+    );
+  }
+
   if (block.type === 'cols2') {
     let parsed = { col1: '', col2: '' };
     try { parsed = JSON.parse(block.text || '{}'); } catch {}
@@ -266,6 +297,10 @@ const Block = React.forwardRef(function Block({
       if (e.key === 'Tab') {
         e.preventDefault();
         (document.activeElement === col1Ref.current ? col2Ref : col1Ref).current?.focus();
+      }
+      if (e.key === 'Backspace') {
+        const bothEmpty = !col1Ref.current?.innerText?.trim() && !col2Ref.current?.innerText?.trim();
+        if (bothEmpty) { e.preventDefault(); onRemoveBlock(block.id); }
       }
     };
     const colPlaceholder = isFocused ? 'Type here...' : '';
@@ -390,13 +425,15 @@ function SlashMenu({ pos, query, onSelect, onClose }) {
 // Markdown shortcuts: typing these prefixes at the start of an empty block
 // converts it to the corresponding type, just like Notion.
 const MD_SHORTCUTS = [
-  { prefix: '# ',   type: 'h1'   },
-  { prefix: '## ',  type: 'h2'   },
-  { prefix: '### ', type: 'h3'   },
-  { prefix: '- ',   type: 'li'   },
-  { prefix: '* ',   type: 'li'   },
-  { prefix: '> ',   type: 'bq'   },
-  { prefix: '```',  type: 'code' },
+  { prefix: '# ',    type: 'h1'   },
+  { prefix: '## ',   type: 'h2'   },
+  { prefix: '### ',  type: 'h3'   },
+  { prefix: '- ',    type: 'li'   },
+  { prefix: '* ',    type: 'li'   },
+  { prefix: '> ',    type: 'bq'   },
+  { prefix: '```',   type: 'code' },
+  { prefix: '[ ] ',  type: 'todo' },
+  { prefix: '[] ',   type: 'todo' },
 ];
 
 function NoteEditor({ note, onSave, onDelete, onBack }) {
@@ -483,6 +520,10 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
 
   const changeBlockType = (id, newType) => {
     setBlocks(bs => bs.map(b => b.id === id ? { ...b, type: newType } : b));
+  };
+
+  const toggleTodo = (id) => {
+    setBlocks(bs => bs.map(b => b.id === id ? { ...b, checked: !b.checked } : b));
   };
 
   const updateBlockHtml = (id, html) => {
@@ -597,8 +638,8 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
       const el = blockRefs.current[block.id];
       const currentText = el?.innerText || '';
 
-      // Empty list item → escape to paragraph
-      if ((block.type === 'li' || block.type === 'num') && !currentText.trim()) {
+      // Empty list/todo item → escape to paragraph
+      if (['li', 'num', 'todo'].includes(block.type) && !currentText.trim()) {
         setBlocks(bs => bs.map(b => b.id === block.id ? { ...b, type: 'p', text: '' } : b));
         setTimeout(() => {
           const el2 = blockRefs.current[block.id];
@@ -608,7 +649,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
       }
 
       const { before, after } = el ? splitHtmlAtCaret(el) : { before: block.text || '', after: '' };
-      const continueType = (block.type === 'li' || block.type === 'num') ? block.type : 'p';
+      const continueType = ['li', 'num', 'todo'].includes(block.type) ? block.type : 'p';
       const newId = Store.uid();
 
       setBlocks(bs => {
@@ -819,6 +860,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
               onRemoveBlock={removeBlockById}
               onAddBelow={(i) => insertBlock(i)}
               onTypeChange={changeBlockType}
+              onToggleTodo={toggleTodo}
               onFocus={() => setFocusedId(block.id)}
               onBlur={() => setFocusedId(id => id === block.id ? null : id)}
               isFocused={focusedId === block.id}

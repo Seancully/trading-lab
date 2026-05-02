@@ -649,16 +649,14 @@ body.light .form-select option { background: #ffffff; color: #0A0A0C; }
   display: flex; flex-direction: column; min-width: 0;
 }
 .block-row {
-  display: flex; align-items: flex-start; gap: 8px;
-  padding: 2px 4px; border-radius: 8px;
-  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+  display: flex; align-items: flex-start; gap: 6px;
+  padding: 1px 4px; border-radius: 6px;
+  transition: box-shadow 0.1s;
 }
-.block-row.is-focused {
-  background: var(--surface2);
-  box-shadow: 0 0 0 1px var(--border2) inset;
-}
+/* No focused highlight — Notion-style: no visual box on focused blocks */
 .block-row.is-over {
-  box-shadow: 0 0 0 1px var(--accentBorder) inset;
+  box-shadow: 0 0 0 1.5px var(--accentBorder) inset;
+  border-radius: 6px;
 }
 /* ── Block action bar (Notion-style hover controls) ─────────────────────── */
 .block-actions-wrap {
@@ -688,13 +686,12 @@ body.light .form-select option { background: #ffffff; color: #0A0A0C; }
 .block-handle:hover { background: var(--surface3); color: var(--text2); }
 .block-handle:active { cursor: grabbing; }
 
-/* Block type / delete dropdown menu */
+/* Block type / delete dropdown menu — position:fixed set inline from button coords */
 .block-type-menu {
-  position: absolute; top: 100%; left: 0; z-index: 120;
   background: var(--surface); border: 1px solid var(--border2);
-  border-radius: 10px; padding: 6px; min-width: 170px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
-  display: flex; flex-direction: column; gap: 2px;
+  border-radius: 10px; padding: 6px; min-width: 185px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+  display: flex; flex-direction: column; gap: 1px;
 }
 .block-type-item {
   display: flex; align-items: center; gap: 8px;
