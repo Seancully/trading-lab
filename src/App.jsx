@@ -238,24 +238,29 @@ function Dashboard({ onNav, accountFilter }) {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(280px, 380px)', gap: 16, alignItems: 'stretch' }} className="dashboard-bottom">
-        <div className="card" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <div className="card-title" style={{ margin: 0 }}>Equity Curve</div>
-            <button onClick={() => onNav('performance')} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)' }}>Full view →</button>
-          </div>
-          <div style={{ flex: 1, minHeight: 240 }}>
-            {stats && stats.equity.length >= 2
-              ? <EquityCurve equity={stats.equity}/>
-              : <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 12 }}>Log trades to see equity curve</div>
-            }
+        {/* Equity curve — green glow behind the glass */}
+        <div className="card-glow-wrap" style={{ '--card-glow': 'rgba(34,197,94,0.20)', display: 'flex', flexDirection: 'column' }}>
+          <div className="card" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div className="card-title" style={{ margin: 0 }}>Equity Curve</div>
+              <button onClick={() => onNav('performance')} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)' }}>Full view →</button>
+            </div>
+            <div style={{ flex: 1, minHeight: 240 }}>
+              {stats && stats.equity.length >= 2
+                ? <EquityCurve equity={stats.equity}/>
+                : <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', fontSize: 12 }}>Log trades to see equity curve</div>
+              }
+            </div>
           </div>
         </div>
 
-        <div className="card" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <div className="card-title" style={{ margin: 0 }}>Recent Trades</div>
-            <button onClick={() => onNav('journal')} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)' }}>All →</button>
-          </div>
+        {/* Recent trades — accent blue glow */}
+        <div className="card-glow-wrap" style={{ '--card-glow': 'rgba(122,162,247,0.18)', display: 'flex', flexDirection: 'column' }}>
+          <div className="card" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div className="card-title" style={{ margin: 0 }}>Recent Trades</div>
+              <button onClick={() => onNav('journal')} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font)' }}>All →</button>
+            </div>
           {recent.length === 0
             ? <div style={{ color: 'var(--text3)', fontSize: 12, padding: '20px 0', textAlign: 'center' }}>No trades yet</div>
             : <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
@@ -286,6 +291,7 @@ function Dashboard({ onNav, accountFilter }) {
                 ))}
               </div>
           }
+          </div>
         </div>
       </div>
     </div>
