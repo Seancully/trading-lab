@@ -287,6 +287,15 @@ button, input, select, textarea { font-family: inherit; }
 .card-glow-wrap {
   position: relative;
   isolation: isolate;
+  /* Fill grid cell so child .card stretches to row height too */
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.card-glow-wrap > .card,
+.card-glow-wrap > .stat-card {
+  flex: 1;
+  height: 100%;
 }
 .card-glow-wrap::before {
   content: '';
@@ -302,6 +311,7 @@ button, input, select, textarea { font-family: inherit; }
 
 .card {
   position: relative;
+  overflow: hidden;
   /* Subtle top→bottom glass gradient — lighter at top edge */
   background:
     linear-gradient(180deg, rgba(255,255,255,0.045) 0%, rgba(255,255,255,0.005) 30%, transparent 100%),
@@ -315,7 +325,23 @@ button, input, select, textarea { font-family: inherit; }
     0 8px 24px -10px rgba(0,0,0,0.4);
   transition: border-color 0.18s, transform 0.18s, box-shadow 0.18s;
 }
-.card:hover { border-color: var(--glass-border-strong); }
+/* Diagonal sheen line — sweeps across on hover (techy macOS feel) */
+.card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -50%;
+  width: 50%; height: 100%;
+  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.06) 50%, transparent 70%);
+  transition: left 0.6s ease;
+  pointer-events: none;
+}
+.card:hover::after { left: 150%; }
+.card:hover {
+  border-color: var(--glass-border-strong);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.12) inset,
+    0 12px 32px -10px rgba(0,0,0,0.5);
+}
 
 /* Elevated cards on the action-y pages — Dashboard, Journal, Performance,
    Calendar. The content pages (Notes/Setups, Rules, Confluences) stay
@@ -455,6 +481,7 @@ button, input, select, textarea { font-family: inherit; }
 /* ── Stat card ──────────────────────────────────────────────────────────── */
 .stat-card {
   position: relative;
+  overflow: hidden;
   background:
     linear-gradient(180deg, rgba(255,255,255,0.045) 0%, rgba(255,255,255,0.005) 30%, transparent 100%),
     rgba(14,14,20,0.32);
@@ -466,9 +493,25 @@ button, input, select, textarea { font-family: inherit; }
   box-shadow:
     0 1px 0 rgba(255,255,255,0.08) inset,
     0 6px 18px -8px rgba(0,0,0,0.4);
-  transition: border-color 0.18s, transform 0.18s;
+  transition: border-color 0.18s, transform 0.18s, box-shadow 0.18s;
 }
-.stat-card:hover { border-color: var(--glass-border-strong); transform: translateY(-1px); }
+.stat-card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -50%;
+  width: 50%; height: 100%;
+  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.06) 50%, transparent 70%);
+  transition: left 0.6s ease;
+  pointer-events: none;
+}
+.stat-card:hover::after { left: 150%; }
+.stat-card:hover {
+  border-color: var(--glass-border-strong);
+  transform: translateY(-1px);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.12) inset,
+    0 10px 24px -8px rgba(0,0,0,0.5);
+}
 .stat-label {
   font-size: 10px; font-weight: 700; text-transform: uppercase;
   letter-spacing: 0.12em; color: var(--text3);
@@ -569,19 +612,28 @@ body.light .form-select option { background: #ffffff; color: #0A0A0C; }
 }
 .modal-close:hover { background: rgba(255,255,255,0.12); color: var(--text); }
 
-/* ── Tabs ───────────────────────────────────────────────────────────────── */
+/* ── Tabs (glass pill row) ──────────────────────────────────────────────── */
 .tabs {
-  display: flex; gap: 2px; background: var(--bg);
+  display: flex; gap: 2px;
+  background: rgba(14,14,20,0.40);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius); padding: 3px; width: fit-content;
-  border: 1px solid var(--border);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 4px 12px -6px rgba(0,0,0,0.4);
 }
 .tab {
   padding: 5px 12px; border-radius: 6px; font-size: 12px;
   font-weight: 500; cursor: pointer; color: var(--text3);
-  transition: all 0.15s; border: none; background: none; font-family: var(--font);
+  transition: color 0.15s, background 0.18s; border: none; background: none;
+  font-family: var(--font);
 }
-.tab.active { background: var(--surface2); color: var(--text); }
-.tab:hover:not(.active) { color: var(--text2); }
+.tab.active {
+  background: rgba(255,255,255,0.08);
+  color: var(--text);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.10) inset;
+}
+.tab:hover:not(.active) { color: var(--text2); background: rgba(255,255,255,0.03); }
 
 /* ── Section separator ──────────────────────────────────────────────────── */
 .section-sep { display: flex; align-items: center; gap: 12px; margin: 20px 0 14px; }
@@ -1031,9 +1083,14 @@ body.light .form-select option { background: #ffffff; color: #0A0A0C; }
 .account-filter-menu {
   position: absolute; top: calc(100% + 6px); right: 0;
   min-width: 220px; max-width: min(320px, calc(100vw - 24px));
-  background: var(--surface2); border: 1px solid var(--border2);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border-strong);
   border-radius: 10px; padding: 6px;
-  box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.08) inset,
+    0 16px 48px rgba(0,0,0,0.5);
   z-index: 100;
   animation: pageIn 0.15s ease;
 }
