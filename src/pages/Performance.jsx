@@ -320,8 +320,14 @@ export function CalendarView({ byDay, trades = [], accountFilter = null }) {
               color={monthPnl > 0 ? 'var(--bull)' : monthPnl < 0 ? 'var(--bear)' : 'var(--text2)'}/>
             <CalHeaderStat label="Trades" value={`${monthTradeCount}`} sub={`${monthWins}W · ${monthLosses}L`}/>
             <CalHeaderStat label="Days" value={`${monthTradedDays}`} sub="traded"/>
-            <CalHeaderStat label="Best day" value={`+$${Math.round(monthBestDay).toLocaleString()}`} color="var(--bull)"/>
-            <CalHeaderStat label="Worst day" value={`-$${Math.round(Math.abs(monthWorstDay)).toLocaleString()}`} color="var(--bear)"/>
+            <CalHeaderStat
+              label="Best day"
+              value={`${monthBestDay >= 0 ? '+' : '-'}$${Math.round(Math.abs(monthBestDay)).toLocaleString()}`}
+              color={monthBestDay > 0 ? 'var(--bull)' : monthBestDay < 0 ? 'var(--bear)' : 'var(--text2)'}/>
+            <CalHeaderStat
+              label="Worst day"
+              value={`${monthWorstDay >= 0 ? '+' : '-'}$${Math.round(Math.abs(monthWorstDay)).toLocaleString()}`}
+              color={monthWorstDay < 0 ? 'var(--bear)' : monthWorstDay > 0 ? 'var(--bull)' : 'var(--text2)'}/>
           </div>
         ) : (
           <span style={{ fontSize: 12, color: 'var(--text3)' }}>No trades this month</span>
