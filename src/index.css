@@ -1808,24 +1808,39 @@ body.light .form-select option { background: #ffffff; color: #0A0A0C; }
   background: rgba(0,0,0,0.18);
 }
 
-/* ── Calendar mobile fix ────────────────────────────────────────────────── */
+/* ── Calendar mobile fix — disable flex-fill, force normal block layout ─── */
 @media (max-width: 720px) {
+  /* Kill the fill-viewport stretching entirely — let content flow naturally */
   .main-content[data-page="calendar"] {
-    /* Don't force fill-viewport on mobile — let content size naturally */
-    min-height: 0;
+    display: block !important;
+    min-height: 0 !important;
+    padding-bottom: 24px;
   }
   .main-content[data-page="calendar"] > .card {
-    flex: initial;
-    padding: 12px;
+    display: block !important;
+    flex: initial !important;
+    height: auto !important;
+    padding: 12px !important;
+  }
+  .calendar-view {
+    display: block !important;
+    flex: initial !important;
+    height: auto !important;
+    min-height: 0 !important;
   }
   .calendar-weeks {
-    flex: initial;
+    display: block !important;
+    flex: initial !important;
+    height: auto !important;
+    min-height: 0 !important;
   }
   .calendar-week {
-    flex: initial;
-    min-height: 0;
+    flex: initial !important;
+    min-height: 0 !important;
+    margin-bottom: 4px;
   }
   .calendar-cell {
+    height: auto !important;
     min-height: 56px !important;
     padding: 6px 4px !important;
   }
@@ -1836,12 +1851,11 @@ body.light .form-select option { background: #ffffff; color: #0A0A0C; }
   .calendar-cell .cal-pnl {
     font-size: 10px;
   }
-  /* Header card: stack stats vertically below month nav */
   .calendar-header-card {
     padding: 10px 12px !important;
     gap: 8px !important;
+    margin-bottom: 12px !important;
   }
-  /* Drawer: make it cover most of the screen on mobile */
   .calendar-drawer {
     right: 8px;
     left: 8px;
@@ -1852,7 +1866,7 @@ body.light .form-select option { background: #ffffff; color: #0A0A0C; }
 }
 @media (max-width: 540px) {
   .calendar-cell {
-    min-height: 48px !important;
+    min-height: 50px !important;
     padding: 5px 2px !important;
   }
   .calendar-headers > div {
@@ -1864,7 +1878,5 @@ body.light .form-select option { background: #ffffff; color: #0A0A0C; }
   .calendar-cell .cal-pnl {
     font-size: 9px;
   }
-  .calendar-weeks { gap: 3px !important; }
-  .calendar-week  { gap: 3px !important; }
 }
 
