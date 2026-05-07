@@ -1741,3 +1741,130 @@ body.light .form-select option { background: #ffffff; color: #0A0A0C; }
   .cat-grid { grid-template-columns: 1fr; gap: 14px; }
 }
 
+/* ── Pre-Market Scenarios (Outlook tab) ─────────────────────────────────── */
+.scenarios-block {
+  padding-top: 20px;
+  margin-top: 20px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.scenarios-empty {
+  font-size: 12px; color: var(--text3);
+  padding: 18px 16px; text-align: center;
+  border: 1px dashed rgba(122,162,247,0.25);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.005));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.scenario-card {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.005) 30%, transparent 100%),
+    rgba(14,14,20,0.36);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.07) inset,
+    0 6px 18px -10px rgba(0,0,0,0.45);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.scenario-card:hover {
+  border-color: rgba(122,162,247,0.25);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.10) inset,
+    0 12px 30px -12px rgba(0,0,0,0.5);
+}
+.scenario-head {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+}
+.scenario-num {
+  width: 26px; height: 26px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; font-family: var(--mono);
+  color: var(--accent);
+  background: linear-gradient(135deg, rgba(122,162,247,0.30), rgba(122,162,247,0.10));
+  border: 1px solid rgba(122,162,247,0.40);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.10) inset,
+    0 0 10px rgba(122,162,247,0.25);
+  flex-shrink: 0;
+}
+.scenario-title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 0 !important;
+  background: rgba(255,255,255,0.025) !important;
+  border-color: rgba(255,255,255,0.07) !important;
+}
+.scenario-title:focus {
+  border-color: rgba(122,162,247,0.40) !important;
+  background: rgba(255,255,255,0.05) !important;
+}
+.scenario-upload {
+  background: rgba(0,0,0,0.18);
+}
+
+/* ── Calendar mobile fix ────────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .main-content[data-page="calendar"] {
+    /* Don't force fill-viewport on mobile — let content size naturally */
+    min-height: 0;
+  }
+  .main-content[data-page="calendar"] > .card {
+    flex: initial;
+    padding: 12px;
+  }
+  .calendar-weeks {
+    flex: initial;
+  }
+  .calendar-week {
+    flex: initial;
+    min-height: 0;
+  }
+  .calendar-cell {
+    min-height: 56px !important;
+    padding: 6px 4px !important;
+  }
+  .calendar-cell .cal-day-num {
+    font-size: 11px;
+    margin-bottom: 3px;
+  }
+  .calendar-cell .cal-pnl {
+    font-size: 10px;
+  }
+  /* Header card: stack stats vertically below month nav */
+  .calendar-header-card {
+    padding: 10px 12px !important;
+    gap: 8px !important;
+  }
+  /* Drawer: make it cover most of the screen on mobile */
+  .calendar-drawer {
+    right: 8px;
+    left: 8px;
+    width: auto;
+    top: calc(var(--nav-h) + 8px);
+    bottom: 8px;
+  }
+}
+@media (max-width: 540px) {
+  .calendar-cell {
+    min-height: 48px !important;
+    padding: 5px 2px !important;
+  }
+  .calendar-headers > div {
+    font-size: 9px !important;
+  }
+  .calendar-cell .cal-day-num {
+    font-size: 10px;
+  }
+  .calendar-cell .cal-pnl {
+    font-size: 9px;
+  }
+  .calendar-weeks { gap: 3px !important; }
+  .calendar-week  { gap: 3px !important; }
+}
+
