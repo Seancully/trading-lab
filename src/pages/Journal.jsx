@@ -193,7 +193,7 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
     grade: null,
     gradeNote: '',
     screenshotUrl: null,
-    outlook: { mnqImageUrl: null, mesImageUrl: null, notes: '' },
+    outlook: { mnqImageUrl: null, mesImageUrl: null, notes: '', scenarios: [] },
   };
 
   const [trade, setTrade] = useState(initTrade || emptyTrade);
@@ -393,6 +393,12 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
             placeholder="HTF narrative, key levels to watch, DOLs in draw, session expectations, SMT levels on MNQ vs MES..."
             rows={5}
           />
+
+          <ScenariosBlock
+            scenarios={trade.outlook?.scenarios || []}
+            onChange={(scenarios) => set('outlook', { ...(trade.outlook || {}), scenarios })}
+            onZoom={(src, caption) => setZoomImage({ src, caption: `${caption} — ${trade.date}` })}
+          />
           </div>
         )}
 
@@ -506,6 +512,126 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
         {zoomImage && <Lightbox src={zoomImage.src} caption={zoomImage.caption} onClose={() => setZoomImage(null)}/>}
       </div>
     </Modal>
+  );
+}
+
+function ScenariosBlock({ scenarios, onChange, onZoom }) {
+  const add = () => onChange([...scenarios, { id: Store.uid(), title: '', image: null }]);
+  const update = (id, patch) => onChange(scenarios.map(s => s.id === id ? { ...s, ...patch } : s));
+  const remove = (id) => onChange(scenarios.filter(s => s.id !== id));
+  const move = (id, dir) => {
+    const idx = scenarios.findIndex(s => s.id === id);
+    const target = idx + dir;
+    if (idx < 0 || target < 0 || target >= scenarios.length) return;
+    const next = [...scenarios];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    onChange(next);
+  };
+
+  return (
+    <div className="scenarios-block" style={{ marginTop: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div>
+          <div className="form-label" style={{ marginBottom: 2 }}>Pre-Market Scenarios</div>
+          <div style={{ fontSize: 11, color: 'var(--text3)' }}>
+            Map out how the session might play out. Add a chart image for each plan.
+          </div>
+        </div>
+        <Btn variant="ghost" size="sm" onClick={add}>
+          <Icon name="plus" size={12}/>Add Scenario
+        </Btn>
+      </div>
+
+      {scenarios.length === 0 ? (
+        <div className="scenarios-empty">
+          No scenarios yet. Click <strong>Add Scenario</strong> to plan multiple ways the market could move.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {scenarios.map((s, i) => (
+            <ScenarioRow key={s.id} index={i + 1} scenario={s}
+              onTitle={(title) => update(s.id, { title })}
+              onImage={(image) => update(s.id, { image })}
+              onRemove={() => remove(s.id)}
+              onUp={() => move(s.id, -1)}
+              onDown={() => move(s.id, 1)}
+              isFirst={i === 0}
+              isLast={i === scenarios.length - 1}
+              onZoom={(url) => onZoom(url, `Scenario ${i + 1}: ${s.title || 'Untitled'}`)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ScenarioRow({ index, scenario, onTitle, onImage, onRemove, onUp, onDown, isFirst, isLast, onZoom }) {
+  const ref = useRef();
+  const [hover, setHover] = useState(false);
+  return (
+    <div className="scenario-card">
+      <div className="scenario-head">
+        <div className="scenario-num">{index}</div>
+        <input
+          className="form-input scenario-title"
+          placeholder={`Scenario ${index} — e.g. "Wait for closure above ATH, retracement, long"`}
+          value={scenario.title}
+          onChange={e => onTitle(e.target.value)}
+        />
+        <div style={{ display: 'flex', gap: 4 }}>
+          <button className="icon-btn" onClick={onUp} disabled={isFirst} title="Move up"
+            style={{ width: 26, height: 26, opacity: isFirst ? 0.3 : 1 }}>
+            <Icon name="long" size={11}/>
+          </button>
+          <button className="icon-btn" onClick={onDown} disabled={isLast} title="Move down"
+            style={{ width: 26, height: 26, opacity: isLast ? 0.3 : 1 }}>
+            <Icon name="short" size={11}/>
+          </button>
+          <button className="icon-btn" onClick={onRemove} title="Delete scenario"
+            style={{ width: 26, height: 26, color: 'var(--bear)' }}>
+            <Icon name="trash" size={11}/>
+          </button>
+        </div>
+      </div>
+
+      <div className="upload-area scenario-upload"
+        style={{ padding: scenario.image ? 0 : 24, overflow: 'hidden', position: 'relative', minHeight: scenario.image ? 0 : 100 }}
+        onClick={() => ref.current.click()}
+        onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      >
+        {scenario.image ? (
+          <>
+            <img src={scenario.image} alt={`Scenario ${index}`}
+              className="lightbox-trigger"
+              onClick={(e) => { e.stopPropagation(); onZoom?.(scenario.image); }}
+              style={{ width: '100%', display: 'block', borderRadius: 8 }}/>
+            <div style={{
+              position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              opacity: hover ? 1 : 0, transition: 'opacity 0.15s', borderRadius: 8,
+              fontSize: 12, color: '#fff', pointerEvents: 'none',
+            }}>Click image to zoom · click outside to replace</div>
+          </>
+        ) : (
+          <>
+            <Icon name="image" size={20}/>
+            <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>
+              Upload scenario chart
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>
+              MNQ + MES side-by-side works great
+            </div>
+          </>
+        )}
+        <input ref={ref} type="file" accept="image/*" style={{ display: 'none' }}
+          onChange={async (e) => {
+            const f = e.target.files[0];
+            if (!f) return;
+            onImage(await Store.compressImage(f));
+          }}/>
+      </div>
+    </div>
   );
 }
 
