@@ -203,6 +203,27 @@ function setStatus(s) {
   listeners.forEach(fn => fn(s));
 }
 
+// Per-key debounced write queue. Without this, every keystroke in a trade
+// editor triggers an upsert that includes the full trade payload — including
+// base64-encoded chart images. That blew through Supabase's Disk IO budget
+// and got the sync indicator stuck because pushes piled up faster than they
+// completed. Coalesce rapid writes for the same key into a single upsert.
+const PUSH_DEBOUNCE_MS = 1500;
+const pendingPushes = new Map(); // key → { value, timer }
+let inflightCount = 0;
+
+function bumpStatus() {
+  if (inflightCount > 0 || pendingPushes.size > 0) setStatus('syncing');
+}
+
+async function flushKey(key) {
+  const entry = pendingPushes.get(key);
+  if (!entry) return;
+  clearTimeout(entry.timer);
+  pendingPushes.delete(key);
+  await Sync._immediatePush(key, entry.value);
+}
+
 export const Sync = {
   get status() { return syncStatus; },
   get user() { return currentUser; },
@@ -213,20 +234,46 @@ export const Sync = {
     if (!u) setStatus(supabaseConfigured ? 'idle' : 'local');
   },
 
-  async push(key, value) {
+  // Internal: actually hit the network. Call .push() (debounced) from
+  // application code; reserve this for the queue's flush path or one-shot
+  // critical writes (deletes, tombstones).
+  async _immediatePush(key, value) {
     if (!supabase || !currentUser) return;
+    inflightCount++;
+    bumpStatus();
     try {
-      setStatus('syncing');
       const { error } = await supabase.from('tl_data').upsert(
         { user_id: currentUser.id, key, value, updated_at: new Date().toISOString() },
         { onConflict: 'user_id,key' }
       );
       if (error) throw error;
-      setStatus('synced');
     } catch (e) {
       console.warn('push failed:', e.message);
-      setStatus('error');
+      inflightCount--;
+      if (inflightCount <= 0 && pendingPushes.size === 0) setStatus('error');
+      return;
     }
+    inflightCount--;
+    if (inflightCount <= 0 && pendingPushes.size === 0) setStatus('synced');
+  },
+
+  // Public push — debounced. Multiple calls for the same key within
+  // PUSH_DEBOUNCE_MS collapse into one upsert carrying only the latest value.
+  push(key, value) {
+    if (!supabase || !currentUser) return;
+    const existing = pendingPushes.get(key);
+    if (existing) clearTimeout(existing.timer);
+    const timer = setTimeout(() => { flushKey(key); }, PUSH_DEBOUNCE_MS);
+    pendingPushes.set(key, { value, timer });
+    bumpStatus();
+  },
+
+  // Flush every queued push immediately. Wired to beforeunload + visibility
+  // change so we don't lose a pending write when the tab closes or the user
+  // backgrounds the app.
+  async flushAll() {
+    const keys = [...pendingPushes.keys()];
+    await Promise.all(keys.map(k => flushKey(k)));
   },
 
   async pull(key) {
@@ -289,10 +336,10 @@ export const Sync = {
       localStorage.setItem(KEYS.deletedTrades, JSON.stringify(tombstoneArr));
       localStorage.setItem(KEYS.deletedTradeFps, JSON.stringify(fpArr));
       if (tombstoneArr.length > (remoteDeleted?.length || 0)) {
-        await this.push('deleted_trades', tombstoneArr);
+        await this._immediatePush('deleted_trades', tombstoneArr);
       }
       if (fpArr.length > (remoteDeletedFps?.length || 0)) {
-        await this.push('deleted_trade_fps', fpArr);
+        await this._immediatePush('deleted_trade_fps', fpArr);
       }
 
       // Trades — drop orphans (missing id), skip tombstoned, then merge.
@@ -333,7 +380,7 @@ export const Sync = {
         const keptIds = new Set(deduped.map(t => t.id));
         localStorage.setItem(KEYS.trades, JSON.stringify(deduped));
         for (const t of deduped) {
-          if (!remoteMap[t.id]) await this.push('trade_' + t.id, t);
+          if (!remoteMap[t.id]) await this._immediatePush('trade_' + t.id, t);
         }
         // Mop up: tombstoned rows + lenient-dup rows still in Supabase.
         for (const r of remoteTrades) {
@@ -358,7 +405,7 @@ export const Sync = {
       const noteTombstoneArr = [...noteTombstoneSet];
       localStorage.setItem(KEYS.deletedNotes, JSON.stringify(noteTombstoneArr));
       if (noteTombstoneArr.length > (remoteDeletedNotes?.length || 0)) {
-        await this.push('deleted_notes', noteTombstoneArr);
+        await this._immediatePush('deleted_notes', noteTombstoneArr);
       }
 
       const remoteNotes = await this.pullPrefix('note_');
@@ -381,17 +428,17 @@ export const Sync = {
         const merged = Object.values({ ...remoteMap, ...localMap });
         localStorage.setItem(KEYS.notes, JSON.stringify(merged));
         for (const n of merged) {
-          if (!remoteMap[n.id]) await this.push('note_' + n.id, n);
+          if (!remoteMap[n.id]) await this._immediatePush('note_' + n.id, n);
         }
       }
       // Rules
       const remoteRules = await this.pull('rules');
       if (remoteRules) localStorage.setItem(KEYS.rules, JSON.stringify(remoteRules));
-      else await this.push('rules', Store.getRules());
+      else await this._immediatePush('rules', Store.getRules());
       // Confluences
       const remoteCnf = await this.pull('confluences');
       if (remoteCnf) localStorage.setItem(KEYS.confluences, JSON.stringify(remoteCnf));
-      else await this.push('confluences', Store.getConfluences());
+      else await this._immediatePush('confluences', Store.getConfluences());
       // Trade order
       const remoteOrder = await this.pull('trade_order');
       if (Array.isArray(remoteOrder)) localStorage.setItem(KEYS.tradeOrder, JSON.stringify(remoteOrder));
@@ -405,7 +452,7 @@ export const Sync = {
         const merged = { ...remoteSettings, theme: local.theme || remoteSettings.theme };
         localStorage.setItem(KEYS.settings, JSON.stringify(merged));
       } else {
-        await this.push('settings', Store.getSettings());
+        await this._immediatePush('settings', Store.getSettings());
       }
       setStatus('synced');
     } catch (e) {
