@@ -486,7 +486,18 @@ export default function App() {
 
   useEffect(() => {
     const unsub = Sync.subscribe(setSyncStatus);
-    return unsub;
+    // Flush any debounced sync writes when the tab is closing or backgrounded
+    // so we don't drop a pending change. visibilitychange covers mobile + tab
+    // switches; beforeunload covers desktop close/refresh.
+    const flush = () => { Sync.flushAll?.(); };
+    const onVisibility = () => { if (document.visibilityState === 'hidden') flush(); };
+    window.addEventListener('beforeunload', flush);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      unsub();
+      window.removeEventListener('beforeunload', flush);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, []);
 
   // Boot: check session
