@@ -23,13 +23,49 @@ export function calcStats(trades, accountFilter = null) {
     ? Math.round(scored.reduce((s, t) => s + t.rulesScore, 0) / scored.length)
     : null;
 
-  let peak = 0, running = 0, maxDD = 0;
   const sorted = [...trades].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-  for (const t of sorted) {
-    running += eff(t);
-    if (running > peak) peak = running;
-    const dd = peak - running;
-    if (dd > maxDD) maxDD = dd;
+
+  // ── Per-account max drawdown ──────────────────────────────────────────────
+  // For prop-firm evals each account has its OWN drawdown limit. Aggregating
+  // across accounts dilutes the per-account loss — what we actually care about
+  // is "is ANY account close to busting?". So compute DD per account and
+  // surface the worst one.
+  //
+  // Build the list of accounts in scope: if a filter is supplied use that,
+  // otherwise union of all accounts that appear on any trade.
+  const accountSet = new Set();
+  for (const t of trades) for (const a of (t.accounts || [])) accountSet.add(a.name);
+  const scope = Array.isArray(accountFilter) && accountFilter.length
+    ? accountFilter
+    : Array.isArray(accountFilter) && accountFilter.length === 0
+      ? [] // explicit empty filter — nothing to compute
+      : [...accountSet];
+
+  let maxDD = 0;
+  let maxDDAccount = null;
+  if (scope.length === 0 && !accountFilter) {
+    // No per-account data at all (legacy trades) — fall back to combined DD.
+    let peak = 0, running = 0;
+    for (const t of sorted) {
+      running += eff(t);
+      if (running > peak) peak = running;
+      const dd = peak - running;
+      if (dd > maxDD) maxDD = dd;
+    }
+  } else {
+    for (const name of scope) {
+      let peak = 0, running = 0, ddForAccount = 0;
+      for (const t of sorted) {
+        const acct = (t.accounts || []).find(a => a.name === name);
+        if (!acct) continue;
+        const pnl = (Number(t.pnlDollars) || 0) * (Number(acct.contracts) || 0);
+        running += pnl;
+        if (running > peak) peak = running;
+        const dd = peak - running;
+        if (dd > ddForAccount) ddForAccount = dd;
+      }
+      if (ddForAccount > maxDD) { maxDD = ddForAccount; maxDDAccount = name; }
+    }
   }
 
   const byDay = {};
@@ -93,7 +129,7 @@ export function calcStats(trades, accountFilter = null) {
   return {
     total: trades.length, wins: wins.length, losses: losses.length, bes: bes.length,
     totalPnl, grossWin, grossLoss, profitFactor, winRate, avgRWin, avgRLoss,
-    avgRulesScore, maxDD, bestDay, worstDay, streak, streakType, equity, byDay,
+    avgRulesScore, maxDD, maxDDAccount, bestDay, worstDay, streak, streakType, equity, byDay,
     series,
   };
 }

@@ -220,7 +220,12 @@ function Dashboard({ onNav, accountFilter }) {
               barColor: 'var(--bull)' },
             { label: 'Max Drawdown',
               num: Math.round(stats.maxDD), fmt: (v) => '-$' + Math.round(v).toLocaleString(),
-              sub: `Best day +$${Math.round(stats.bestDay)}`, color: 'var(--bear)',
+              sub: stats.maxDDAccount
+                ? `Worst: ${stats.maxDDAccount}`
+                : (stats.bestDay >= 0
+                    ? `Best day +$${Math.round(stats.bestDay).toLocaleString()}`
+                    : `Best day -$${Math.round(Math.abs(stats.bestDay)).toLocaleString()}`),
+              color: 'var(--bear)',
               bar: stats.bestDay > 0 ? Math.min(stats.maxDD / stats.bestDay, 1) : 0,
               barColor: 'var(--bear)' },
             { label: 'Rules Score',
