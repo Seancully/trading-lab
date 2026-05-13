@@ -137,6 +137,7 @@ const Block = React.forwardRef(function Block({
   onDragOver,
   onDrop,
   onDragEnd,
+  onImageClick,
 }, ref) {
   const fileRef    = useRef();
   const localRef   = useRef(null);
@@ -229,7 +230,8 @@ const Block = React.forwardRef(function Block({
         <div style={{ padding: '4px 0', flex: 1 }}>
           {block.imageUrl ? (
             <div className="block-image">
-              <img src={block.imageUrl} alt="" style={{ maxWidth: '100%', borderRadius: 8, border: '1px solid var(--border)', display: 'block' }}/>
+              <img src={block.imageUrl} alt="" onClick={() => onImageClick?.(block.imageUrl)}
+                style={{ maxWidth: '100%', borderRadius: 8, border: '1px solid var(--border)', display: 'block', cursor: 'zoom-in' }}/>
               <button type="button" className="block-image-remove" title="Remove image" onClick={() => onRemoveBlock?.(block.id)}>
                 <Icon name="trash" size={12}/>
               </button>
@@ -448,6 +450,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
   const [focusedId,   setFocusedId]   = useState(null);
   const [titleFocused,setTitleFocused]= useState(false);
   const [dragOverId,  setDragOverId]  = useState(null);
+  const [lightboxUrl, setLightboxUrl] = useState(null);
   const blockRefs  = useRef({});
   const bodyRef    = useRef(null);
   const saveTimer  = useRef(null);
@@ -809,6 +812,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
           setTimeout(() => focusBlock(last.id), 30);
         }}
       >
+        <div style={{ maxWidth: 1000, margin: '0 auto' }}>
         <div style={{ fontSize: 38, marginBottom: 10, cursor: 'default', userSelect: 'none', lineHeight: 1 }}>{emoji}</div>
 
         <div
@@ -849,7 +853,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
 
         <hr style={{ border: 'none', borderTop: '1px solid var(--border)', marginBottom: 24 }}/>
 
-        <div style={{ maxWidth: 700 }}>
+        <div>
           {blocks.map((block, idx) => (
             <Block
               key={block.id}
@@ -872,6 +876,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
               onDrop={handleDrop}
               onDragEnd={handleDragEnd}
               onImageUpload={url => setBlocks(bs => bs.map(b => b.id === block.id ? { ...b, imageUrl: url } : b))}
+              onImageClick={(url) => setLightboxUrl(url)}
             />
           ))}
 
@@ -889,6 +894,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
             )}
           </div>
         </div>
+        </div>
       </div>
 
       {slash && (
@@ -897,6 +903,30 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
       )}
 
       <SelectionToolbar containerRef={bodyRef}/>
+
+      {lightboxUrl && (
+        <Lightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
+      )}
+    </div>
+  );
+}
+
+function Lightbox({ url, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+  }, [onClose]);
+  return (
+    <div className="lightbox-overlay" onClick={onClose} role="dialog" aria-modal="true">
+      <button className="lightbox-close" onClick={onClose} title="Close (Esc)">
+        <Icon name="x" size={16}/>
+      </button>
+      <img src={url} alt="" className="lightbox-image" onClick={(e) => e.stopPropagation()}/>
     </div>
   );
 }
