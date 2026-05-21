@@ -196,47 +196,7 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
     outlook: { mnqImageUrl: null, mesImageUrl: null, notes: '', scenarios: [] },
   };
 
-  // ── Outlook auto-fill from same-day trades ────────────────────────────────
-  // If the user already logged a trade today (same date), the outlook (bias,
-  // scenarios, MNQ/MES charts, narrative) almost certainly applies to every
-  // subsequent trade in that session too. Pull it from the earliest trade on
-  // that date so the user doesn't re-type the same pre-market analysis.
-  const isOutlookEmpty = (o) => !o || (
-    !o.mnqImageUrl && !o.mesImageUrl &&
-    !(o.notes || '').trim() &&
-    !(o.scenarios || []).length
-  );
-  const outlookFromDate = (dateStr) => {
-    if (!dateStr) return null;
-    const sameDay = Store.getTrades()
-      .filter(t => t.date === dateStr && !isOutlookEmpty(t.outlook))
-      .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
-    if (!sameDay.length) return null;
-    const src = sameDay[0].outlook;
-    // Deep-ish clone so editing scenarios on the new trade doesn't mutate the source.
-    return {
-      mnqImageUrl: src.mnqImageUrl || null,
-      mesImageUrl: src.mesImageUrl || null,
-      notes: src.notes || '',
-      scenarios: (src.scenarios || []).map(s => ({ ...s, id: Store.uid() })),
-    };
-  };
-
-  const [trade, setTrade] = useState(() => {
-    if (initTrade) return initTrade;
-    const inherited = outlookFromDate(emptyTrade.date);
-    return inherited ? { ...emptyTrade, outlook: inherited } : emptyTrade;
-  });
-
-  // If user changes the date and their outlook is still empty/untouched,
-  // pull the outlook from the new date's first trade.
-  useEffect(() => {
-    if (!isNew) return;
-    if (!isOutlookEmpty(trade.outlook)) return;
-    const inherited = outlookFromDate(trade.date);
-    if (inherited) setTrade(t => ({ ...t, outlook: inherited }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trade.date]);
+  const [trade, setTrade] = useState(initTrade || emptyTrade);
   const [tab, setTab] = useState('Details');
   const [dragging, setDragging] = useState(false);
   const [confluenceGroups, setConfluenceGroups] = useState(() => Store.getConfluences());
@@ -414,25 +374,6 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
           <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 16 }}>
             Pre-session context. Upload your MNQ and MES charts side by side, then note your bias and key levels below.
           </p>
-
-          {isNew && (() => {
-            const sourceCount = Store.getTrades()
-              .filter(t => t.date === trade.date && !isOutlookEmpty(t.outlook))
-              .length;
-            if (!sourceCount || isOutlookEmpty(trade.outlook)) return null;
-            return (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '8px 12px', marginBottom: 16,
-                background: 'rgba(122,162,247,0.08)',
-                border: '1px solid rgba(122,162,247,0.25)',
-                borderRadius: 8, fontSize: 12, color: 'var(--text2)',
-              }}>
-                <Icon name="sun" size={13}/>
-                <span>Outlook auto-filled from your first trade on {trade.date}. Edits here only affect this trade.</span>
-              </div>
-            );
-          })()}
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 20 }}>
             {[
@@ -796,8 +737,16 @@ export default function Journal({ rules, settings, openTradeId, onOpenHandled, a
   }, [openTradeId, autoTrade, onOpenHandled]);
 
   const handleSave = (trade) => {
-    setTrades(Store.saveTrade(trade));
-    toast.success('Trade saved');
+    try {
+      setTrades(Store.saveTrade(trade));
+      toast.success('Trade saved');
+    } catch (e) {
+      const isQuota = e?.name === 'QuotaExceededError' || /quota|exceeded/i.test(e?.message || '');
+      toast.error(isQuota
+        ? 'Local storage is full. Delete a few old trades (especially ones with chart screenshots) and try again.'
+        : `Save failed: ${e?.message || 'unknown error'}`);
+      console.error('saveTrade failed:', e);
+    }
   };
   const handleDelete = (id) => {
     setTrades(Store.deleteTrade(id));
