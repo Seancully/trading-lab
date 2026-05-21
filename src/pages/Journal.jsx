@@ -245,7 +245,8 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
   const handleImage = async (file) => {
     if (!file || !file.type.startsWith('image/')) return;
     const compressed = await Store.compressImage(file);
-    set('screenshotUrl', compressed);
+    const url = await Store.uploadImageIfPossible(compressed);
+    set('screenshotUrl', url);
   };
 
   const handleDrop = (e) => {
@@ -628,7 +629,8 @@ function ScenarioRow({ index, scenario, onTitle, onImage, onRemove, onUp, onDown
           onChange={async (e) => {
             const f = e.target.files[0];
             if (!f) return;
-            onImage(await Store.compressImage(f));
+            const compressed = await Store.compressImage(f);
+            onImage(await Store.uploadImageIfPossible(compressed));
           }}/>
       </div>
     </div>
@@ -670,7 +672,8 @@ function OutlookUpload({ label, url, onChange, onZoom }) {
           onChange={async (e) => {
             const f = e.target.files[0];
             if (!f) return;
-            onChange(await Store.compressImage(f));
+            const compressed = await Store.compressImage(f);
+            onChange(await Store.uploadImageIfPossible(compressed));
           }}/>
       </div>
     </div>

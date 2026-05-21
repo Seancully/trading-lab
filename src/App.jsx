@@ -517,7 +517,7 @@ export default function App() {
         Sync.setUser(session.user);
         setUser(session.user);
         setAuthState('ready');
-        Sync.syncAll();
+        Sync.syncAll().then(() => Store.migrateImagesToStorage());
       } else {
         setAuthState('login');
       }
