@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sync, Store } from '../lib/store.js';
+import { Sync } from '../lib/store.js';
 import { supabaseConfigured } from '../lib/supabase.js';
 
 export default function Login({ onAuth, onLocalOnly }) {
@@ -26,7 +26,6 @@ export default function Login({ onAuth, onLocalOnly }) {
       Sync.setUser(result.user);
       await Sync.syncAll();
       onAuth(result.user);
-      Store.migrateImagesToStorage();
     }
   };
 

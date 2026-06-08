@@ -2,7 +2,7 @@
 // Each row in `tl_data` is keyed by (user_id, key) with RLS so a user
 // only ever reads/writes their own rows.
 
-import { supabase, supabaseConfigured, uploadDataUrl, deleteImageByUrl } from './supabase.js';
+import { supabase, supabaseConfigured } from './supabase.js';
 
 const KEYS = {
   trades: 'tl_trades',
@@ -836,67 +836,7 @@ export const Store = {
     const fp = target ? tradeFingerprint(target) : null;
     this._tombstoneTrade(id, fp);
     if (id) Sync.deleteKey('trade_' + id);
-    if (target) this._cleanupTradeImages(target);
     return next;
-  },
-  // Upload a data: URL to Supabase Storage and return the public URL. Falls
-  // back to the original dataUrl if Supabase isn't configured / user isn't
-  // signed in / the upload fails — so offline behaviour still works, the
-  // image just stays embedded in the trade JSON until the next online save.
-  async uploadImageIfPossible(dataUrl) {
-    if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return dataUrl;
-    if (!currentUser) return dataUrl;
-    const url = await uploadDataUrl(dataUrl, currentUser.id);
-    return url || dataUrl;
-  },
-  // Best-effort cleanup: when a trade is deleted, remove its uploaded
-  // images so they don't pile up in the bucket forever.
-  _cleanupTradeImages(trade) {
-    if (!currentUser || !trade) return;
-    const urls = [];
-    if (trade.screenshotUrl) urls.push(trade.screenshotUrl);
-    if (trade.outlook) {
-      if (trade.outlook.mnqImageUrl) urls.push(trade.outlook.mnqImageUrl);
-      if (trade.outlook.mesImageUrl) urls.push(trade.outlook.mesImageUrl);
-      (trade.outlook.scenarios || []).forEach(s => s?.image && urls.push(s.image));
-    }
-    urls.forEach(u => deleteImageByUrl(u, currentUser.id));
-  },
-  // One-time per device: walk all trades, upload any base64 images to
-  // Supabase Storage, and replace the field with the public URL. Shrinks
-  // localStorage massively for users with bloated outlook screenshots.
-  async migrateImagesToStorage() {
-    if (!supabase || !currentUser) return { migrated: 0 };
-    const trades = this.getTrades();
-    let migrated = 0;
-    for (const t of trades) {
-      let touched = false;
-      if (t.screenshotUrl && t.screenshotUrl.startsWith('data:')) {
-        const url = await uploadDataUrl(t.screenshotUrl, currentUser.id);
-        if (url) { t.screenshotUrl = url; touched = true; migrated++; }
-      }
-      if (t.outlook) {
-        for (const k of ['mnqImageUrl', 'mesImageUrl']) {
-          if (t.outlook[k] && t.outlook[k].startsWith('data:')) {
-            const url = await uploadDataUrl(t.outlook[k], currentUser.id);
-            if (url) { t.outlook[k] = url; touched = true; migrated++; }
-          }
-        }
-        if (Array.isArray(t.outlook.scenarios)) {
-          for (const s of t.outlook.scenarios) {
-            if (s && s.image && typeof s.image === 'string' && s.image.startsWith('data:')) {
-              const url = await uploadDataUrl(s.image, currentUser.id);
-              if (url) { s.image = url; touched = true; migrated++; }
-            }
-          }
-        }
-      }
-      if (touched) {
-        try { this.saveTrade(t); } catch (e) { console.warn('migrate save failed:', e?.message); }
-      }
-    }
-    if (migrated) console.info(`Migrated ${migrated} image${migrated === 1 ? '' : 's'} to Supabase Storage.`);
-    return { migrated };
   },
   clearLocalTrades() { localStorage.removeItem(KEYS.trades); },
 
@@ -1029,42 +969,23 @@ export const Store = {
     Object.values(KEYS).forEach(k => localStorage.removeItem(k));
   },
 
-  // Read a file as a data URL (no compression). Used as a fallback when
-  // the browser can't decode the image into an <img> (e.g. HEIC).
-  _readAsDataUrl(file) {
-    return new Promise((resolve, reject) => {
+  compressImage(file) {
+    return new Promise((resolve) => {
       const reader = new FileReader();
-      reader.onerror = () => reject(new Error('FileReader failed'));
-      reader.onload = (e) => resolve(e.target.result);
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX = 900;
+          let w = img.width, h = img.height;
+          if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.75));
+        };
+        img.src = e.target.result;
+      };
       reader.readAsDataURL(file);
     });
-  },
-  async compressImage(file) {
-    // First, read the file into a data URL so we always have a fallback.
-    const rawDataUrl = await this._readAsDataUrl(file);
-    // Then try to decode + downscale via canvas. If decode fails (HEIC,
-    // weird format), return the raw data URL so the user still gets to
-    // attach their screenshot.
-    try {
-      return await new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onerror = () => reject(new Error('Image decode failed'));
-        img.onload = () => {
-          try {
-            const MAX = 900;
-            let w = img.width, h = img.height;
-            if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
-            const canvas = document.createElement('canvas');
-            canvas.width = w; canvas.height = h;
-            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-            resolve(canvas.toDataURL('image/jpeg', 0.75));
-          } catch (err) { reject(err); }
-        };
-        img.src = rawDataUrl;
-      });
-    } catch (err) {
-      console.warn('compress failed, using uncompressed copy:', err);
-      return rawDataUrl;
-    }
   },
 };

@@ -245,7 +245,7 @@ const Block = React.forwardRef(function Block({
               <Icon name="image" size={20}/>
               <span style={{ fontSize: 12, marginTop: 4 }}>Click to upload image</span>
               <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }}
-                onChange={async e => { const f = e.target.files[0]; if (f) { const c = await Store.compressImage(f); onImageUpload(await Store.uploadImageIfPossible(c)); } }}/>
+                onChange={async e => { const f = e.target.files[0]; if (f) onImageUpload(await Store.compressImage(f)); }}/>
             </div>
           )}
         </div>
@@ -734,8 +734,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
 
   const handlePasteImage = async (file, id) => {
     if (!file || !file.type.startsWith('image/')) return;
-    const compressed = await Store.compressImage(file);
-    const imageUrl = await Store.uploadImageIfPossible(compressed);
+    const imageUrl = await Store.compressImage(file);
     setBlocks(bs => bs.map(b => b.id === id ? { ...b, type: 'img', imageUrl, text: '' } : b));
   };
 
@@ -777,8 +776,7 @@ function NoteEditor({ note, onSave, onDelete, onBack }) {
               const file = item.getAsFile();
               if (!file) continue;
               e.preventDefault();
-              const compressed = await Store.compressImage(file);
-              const url = await Store.uploadImageIfPossible(compressed);
+              const url = await Store.compressImage(file);
               const nb = { id: Store.uid(), type: 'img', text: '', imageUrl: url };
               setBlocks(bs => {
                 const idx = bs.findIndex(b => b.id === focusedId);

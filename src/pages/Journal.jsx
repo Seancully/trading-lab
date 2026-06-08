@@ -170,22 +170,6 @@ function AccountRow({ acc, settings, onChange, onRemove }) {
   );
 }
 
-// Verify an image URL actually loads in the browser. Used to avoid
-// swapping a working data URL for a broken Supabase URL.
-function urlLoads(src) {
-  return new Promise((resolve) => {
-    if (!src || typeof src !== 'string') return resolve(false);
-    if (src.startsWith('data:')) return resolve(true);
-    const img = new Image();
-    let done = false;
-    const finish = (ok) => { if (done) return; done = true; resolve(ok); };
-    img.onload = () => finish(true);
-    img.onerror = () => finish(false);
-    setTimeout(() => finish(false), 5000);
-    img.src = src;
-  });
-}
-
 function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClose, isNew }) {
   const emptyTrade = {
     id: Store.uid(),
@@ -260,27 +244,8 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
 
   const handleImage = async (file) => {
     if (!file || !file.type.startsWith('image/')) return;
-    let compressed;
-    try {
-      compressed = await Store.compressImage(file);
-    } catch (err) {
-      console.error('compressImage failed:', err);
-      toast.error("Couldn't read that image — try a different file.");
-      return;
-    }
-    // Show the image immediately so the user knows it worked.
+    const compressed = await Store.compressImage(file);
     set('screenshotUrl', compressed);
-    // Then try to upload to Storage in the background. Only swap to the
-    // URL if it actually loads — otherwise keep the data URL so the user
-    // never sees a broken-image icon.
-    try {
-      const uploaded = await Store.uploadImageIfPossible(compressed);
-      if (uploaded && uploaded !== compressed && await urlLoads(uploaded)) {
-        set('screenshotUrl', uploaded);
-      }
-    } catch (err) {
-      console.warn('image upload to storage failed (keeping local copy):', err);
-    }
   };
 
   const handleDrop = (e) => {
@@ -663,14 +628,7 @@ function ScenarioRow({ index, scenario, onTitle, onImage, onRemove, onUp, onDown
           onChange={async (e) => {
             const f = e.target.files[0];
             if (!f) return;
-            let compressed;
-            try { compressed = await Store.compressImage(f); }
-            catch { toast.error("Couldn't read that image — try a different file."); return; }
-            onImage(compressed);
-            try {
-              const uploaded = await Store.uploadImageIfPossible(compressed);
-              if (uploaded && uploaded !== compressed && await urlLoads(uploaded)) onImage(uploaded);
-            } catch (err) { console.warn('image upload failed:', err); }
+            onImage(await Store.compressImage(f));
           }}/>
       </div>
     </div>
@@ -712,14 +670,7 @@ function OutlookUpload({ label, url, onChange, onZoom }) {
           onChange={async (e) => {
             const f = e.target.files[0];
             if (!f) return;
-            let compressed;
-            try { compressed = await Store.compressImage(f); }
-            catch { toast.error("Couldn't read that image — try a different file."); return; }
-            onChange(compressed);
-            try {
-              const uploaded = await Store.uploadImageIfPossible(compressed);
-              if (uploaded && uploaded !== compressed && await urlLoads(uploaded)) onChange(uploaded);
-            } catch (err) { console.warn('image upload failed:', err); }
+            onChange(await Store.compressImage(f));
           }}/>
       </div>
     </div>
