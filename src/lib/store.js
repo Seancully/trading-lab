@@ -1029,11 +1029,24 @@ export const Store = {
     Object.values(KEYS).forEach(k => localStorage.removeItem(k));
   },
 
-  compressImage(file) {
+  // Read a file as a data URL (no compression). Used as a fallback when
+  // the browser can't decode the image into an <img> (e.g. HEIC).
+  _readAsDataUrl(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onerror = () => reject(new Error('FileReader failed'));
-      reader.onload = (e) => {
+      reader.onload = (e) => resolve(e.target.result);
+      reader.readAsDataURL(file);
+    });
+  },
+  async compressImage(file) {
+    // First, read the file into a data URL so we always have a fallback.
+    const rawDataUrl = await this._readAsDataUrl(file);
+    // Then try to decode + downscale via canvas. If decode fails (HEIC,
+    // weird format), return the raw data URL so the user still gets to
+    // attach their screenshot.
+    try {
+      return await new Promise((resolve, reject) => {
         const img = new Image();
         img.onerror = () => reject(new Error('Image decode failed'));
         img.onload = () => {
@@ -1047,9 +1060,11 @@ export const Store = {
             resolve(canvas.toDataURL('image/jpeg', 0.75));
           } catch (err) { reject(err); }
         };
-        img.src = e.target.result;
-      };
-      reader.readAsDataURL(file);
-    });
+        img.src = rawDataUrl;
+      });
+    } catch (err) {
+      console.warn('compress failed, using uncompressed copy:', err);
+      return rawDataUrl;
+    }
   },
 };
