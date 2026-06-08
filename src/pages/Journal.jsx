@@ -244,9 +244,23 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
 
   const handleImage = async (file) => {
     if (!file || !file.type.startsWith('image/')) return;
-    const compressed = await Store.compressImage(file);
-    const url = await Store.uploadImageIfPossible(compressed);
-    set('screenshotUrl', url);
+    let compressed;
+    try {
+      compressed = await Store.compressImage(file);
+    } catch (err) {
+      console.error('compressImage failed:', err);
+      toast.error("Couldn't read that image — try a different file.");
+      return;
+    }
+    // Show the image immediately so the user knows it worked.
+    set('screenshotUrl', compressed);
+    // Then try to upload to Storage in the background and swap to the URL.
+    try {
+      const uploaded = await Store.uploadImageIfPossible(compressed);
+      if (uploaded && uploaded !== compressed) set('screenshotUrl', uploaded);
+    } catch (err) {
+      console.warn('image upload to storage failed (keeping local copy):', err);
+    }
   };
 
   const handleDrop = (e) => {
@@ -629,8 +643,14 @@ function ScenarioRow({ index, scenario, onTitle, onImage, onRemove, onUp, onDown
           onChange={async (e) => {
             const f = e.target.files[0];
             if (!f) return;
-            const compressed = await Store.compressImage(f);
-            onImage(await Store.uploadImageIfPossible(compressed));
+            let compressed;
+            try { compressed = await Store.compressImage(f); }
+            catch { toast.error("Couldn't read that image — try a different file."); return; }
+            onImage(compressed);
+            try {
+              const uploaded = await Store.uploadImageIfPossible(compressed);
+              if (uploaded && uploaded !== compressed) onImage(uploaded);
+            } catch (err) { console.warn('image upload failed:', err); }
           }}/>
       </div>
     </div>
@@ -672,8 +692,14 @@ function OutlookUpload({ label, url, onChange, onZoom }) {
           onChange={async (e) => {
             const f = e.target.files[0];
             if (!f) return;
-            const compressed = await Store.compressImage(f);
-            onChange(await Store.uploadImageIfPossible(compressed));
+            let compressed;
+            try { compressed = await Store.compressImage(f); }
+            catch { toast.error("Couldn't read that image — try a different file."); return; }
+            onChange(compressed);
+            try {
+              const uploaded = await Store.uploadImageIfPossible(compressed);
+              if (uploaded && uploaded !== compressed) onChange(uploaded);
+            } catch (err) { console.warn('image upload failed:', err); }
           }}/>
       </div>
     </div>

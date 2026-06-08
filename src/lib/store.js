@@ -1030,18 +1030,22 @@ export const Store = {
   },
 
   compressImage(file) {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
+      reader.onerror = () => reject(new Error('FileReader failed'));
       reader.onload = (e) => {
         const img = new Image();
+        img.onerror = () => reject(new Error('Image decode failed'));
         img.onload = () => {
-          const MAX = 900;
-          let w = img.width, h = img.height;
-          if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
-          const canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = h;
-          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', 0.75));
+          try {
+            const MAX = 900;
+            let w = img.width, h = img.height;
+            if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', 0.75));
+          } catch (err) { reject(err); }
         };
         img.src = e.target.result;
       };
