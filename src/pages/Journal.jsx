@@ -170,6 +170,22 @@ function AccountRow({ acc, settings, onChange, onRemove }) {
   );
 }
 
+// Verify an image URL actually loads in the browser. Used to avoid
+// swapping a working data URL for a broken Supabase URL.
+function urlLoads(src) {
+  return new Promise((resolve) => {
+    if (!src || typeof src !== 'string') return resolve(false);
+    if (src.startsWith('data:')) return resolve(true);
+    const img = new Image();
+    let done = false;
+    const finish = (ok) => { if (done) return; done = true; resolve(ok); };
+    img.onload = () => finish(true);
+    img.onerror = () => finish(false);
+    setTimeout(() => finish(false), 5000);
+    img.src = src;
+  });
+}
+
 function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClose, isNew }) {
   const emptyTrade = {
     id: Store.uid(),
@@ -254,10 +270,14 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
     }
     // Show the image immediately so the user knows it worked.
     set('screenshotUrl', compressed);
-    // Then try to upload to Storage in the background and swap to the URL.
+    // Then try to upload to Storage in the background. Only swap to the
+    // URL if it actually loads — otherwise keep the data URL so the user
+    // never sees a broken-image icon.
     try {
       const uploaded = await Store.uploadImageIfPossible(compressed);
-      if (uploaded && uploaded !== compressed) set('screenshotUrl', uploaded);
+      if (uploaded && uploaded !== compressed && await urlLoads(uploaded)) {
+        set('screenshotUrl', uploaded);
+      }
     } catch (err) {
       console.warn('image upload to storage failed (keeping local copy):', err);
     }
@@ -649,7 +669,7 @@ function ScenarioRow({ index, scenario, onTitle, onImage, onRemove, onUp, onDown
             onImage(compressed);
             try {
               const uploaded = await Store.uploadImageIfPossible(compressed);
-              if (uploaded && uploaded !== compressed) onImage(uploaded);
+              if (uploaded && uploaded !== compressed && await urlLoads(uploaded)) onImage(uploaded);
             } catch (err) { console.warn('image upload failed:', err); }
           }}/>
       </div>
@@ -698,7 +718,7 @@ function OutlookUpload({ label, url, onChange, onZoom }) {
             onChange(compressed);
             try {
               const uploaded = await Store.uploadImageIfPossible(compressed);
-              if (uploaded && uploaded !== compressed) onChange(uploaded);
+              if (uploaded && uploaded !== compressed && await urlLoads(uploaded)) onChange(uploaded);
             } catch (err) { console.warn('image upload failed:', err); }
           }}/>
       </div>
