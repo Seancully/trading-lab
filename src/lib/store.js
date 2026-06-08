@@ -969,23 +969,39 @@ export const Store = {
     Object.values(KEYS).forEach(k => localStorage.removeItem(k));
   },
 
+  // Compress an image file to a JPEG data URL. If the browser can't
+  // decode the file into an <img> (HEIC, weird format) we fall back to
+  // the uncompressed data URL so the user still gets their screenshot
+  // attached instead of the promise hanging forever.
   compressImage(file) {
-    return new Promise((resolve) => {
+    const readAsDataUrl = () => new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          const MAX = 900;
-          let w = img.width, h = img.height;
-          if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
-          const canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = h;
-          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', 0.75));
-        };
-        img.src = e.target.result;
-      };
+      reader.onerror = () => reject(new Error('FileReader failed'));
+      reader.onload = (e) => resolve(e.target.result);
       reader.readAsDataURL(file);
     });
+    return readAsDataUrl().then(rawDataUrl =>
+      new Promise((resolve) => {
+        const img = new Image();
+        let settled = false;
+        const fallback = () => { if (!settled) { settled = true; resolve(rawDataUrl); } };
+        img.onerror = fallback;
+        setTimeout(fallback, 4000); // never hang
+        img.onload = () => {
+          if (settled) return;
+          settled = true;
+          try {
+            const MAX = 900;
+            let w = img.width, h = img.height;
+            if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', 0.75));
+          } catch { resolve(rawDataUrl); }
+        };
+        img.src = rawDataUrl;
+      })
+    );
   },
 };

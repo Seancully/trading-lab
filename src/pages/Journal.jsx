@@ -243,9 +243,17 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
   };
 
   const handleImage = async (file) => {
-    if (!file || !file.type.startsWith('image/')) return;
-    const compressed = await Store.compressImage(file);
-    set('screenshotUrl', compressed);
+    if (!file || !file.type.startsWith('image/')) {
+      if (file) toast.error(`Unsupported file type: ${file.type || 'unknown'}`);
+      return;
+    }
+    try {
+      const compressed = await Store.compressImage(file);
+      set('screenshotUrl', compressed);
+    } catch (err) {
+      console.error('handleImage failed:', err);
+      toast.error("Couldn't read that image — try a different file.");
+    }
   };
 
   const handleDrop = (e) => {
