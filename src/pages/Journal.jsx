@@ -243,10 +243,13 @@ function TradeModal({ trade: initTrade, rules, settings, onSave, onDelete, onClo
   };
 
   const handleImage = async (file) => {
-    if (!file || !file.type.startsWith('image/')) {
-      if (file) toast.error(`Unsupported file type: ${file.type || 'unknown'}`);
-      return;
-    }
+    // Note: we intentionally do NOT gate on file.type here. Some valid
+    // image files (depending on OS / screenshot tool / paste source)
+    // report an empty or non-"image/*" MIME type, which silently broke
+    // this upload while the Outlook/scenario uploads — which don't check
+    // type — kept working. compressImage decodes the bytes and falls
+    // back gracefully, so we just need a file.
+    if (!file) return;
     try {
       const compressed = await Store.compressImage(file);
       set('screenshotUrl', compressed);
