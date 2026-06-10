@@ -82,7 +82,7 @@ export function Badge({ result }) {
 // ── Trade grading ────────────────────────────────────────────────────────────
 export const GRADES = ['A+', 'A', 'B', 'C', 'D'];
 export const GRADE_META = {
-  'A+': { color: '#fbbf24', bg: 'rgba(251,191,36,0.14)', border: 'rgba(251,191,36,0.35)', label: 'Elite'      },
+  'A+': { color: '#E8C49A', bg: 'rgba(212,165,116,0.16)', border: 'rgba(212,165,116,0.42)', label: 'Elite'      },
   'A':  { color: '#22c55e', bg: 'rgba(34,197,94,0.12)',  border: 'rgba(34,197,94,0.30)',  label: 'Great'      },
   'B':  { color: '#60a5fa', bg: 'rgba(96,165,250,0.12)', border: 'rgba(96,165,250,0.30)', label: 'Solid'      },
   'C':  { color: '#f97316', bg: 'rgba(249,115,22,0.12)', border: 'rgba(249,115,22,0.30)', label: 'Borderline' },
@@ -120,7 +120,7 @@ export function PnlText({ value, prefix = '$', size = 14 }) {
   const color = v > 0 ? 'var(--bull)' : v < 0 ? 'var(--bear)' : 'var(--be)';
   return (
     <span style={{ color, fontFamily: 'var(--mono)', fontSize: size, fontWeight: 600 }}>
-      {v > 0 ? '+' : ''}{prefix}{v > 0 ? v.toLocaleString() : Math.abs(v).toLocaleString()}
+      {v > 0 ? '+' : v < 0 ? '-' : ''}{prefix}{Math.abs(v).toLocaleString()}
     </span>
   );
 }

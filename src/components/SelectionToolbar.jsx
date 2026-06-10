@@ -73,18 +73,18 @@ export default function SelectionToolbar({ containerRef }) {
       <span className="sel-sep"/>
       <ColorPopover label="A" title="Text color" colors={[
         { name: 'Default', v: 'inherit' },
-        { name: 'Accent',  v: '#7AA2F7' },
+        { name: 'Gold',    v: '#D4A574' },
         { name: 'Bull',    v: '#22C55E' },
         { name: 'Bear',    v: '#EF4444' },
-        { name: 'Amber',   v: '#D4A574' },
-        { name: 'Muted',   v: 'rgba(232,234,237,0.55)' },
+        { name: 'Blue',    v: '#60A5FA' },
+        { name: 'Muted',   v: 'rgba(237,233,226,0.55)' },
       ]} onPick={setColor}/>
       <ColorPopover label="🎨" title="Highlight" colors={[
         { name: 'None',    v: 'transparent' },
-        { name: 'Accent',  v: 'rgba(122,162,247,0.18)' },
+        { name: 'Gold',    v: 'rgba(212,165,116,0.20)' },
         { name: 'Bull',    v: 'rgba(34,197,94,0.18)' },
         { name: 'Bear',    v: 'rgba(239,68,68,0.18)' },
-        { name: 'Amber',   v: 'rgba(212,165,116,0.20)' },
+        { name: 'Blue',    v: 'rgba(96,165,250,0.18)' },
       ]} onPick={setHighlight}/>
       <span className="sel-sep"/>
       <button className="sel-btn" onClick={clear} title="Clear formatting">✕</button>

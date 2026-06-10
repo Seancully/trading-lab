@@ -116,7 +116,7 @@ function Logo() {
 const loginWrap = {
   height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
   background: 'var(--bg)', padding: 20,
-  backgroundImage: 'radial-gradient(ellipse 60% 50% at 50% -10%, rgba(122,162,247,0.07) 0%, transparent 70%)',
+  backgroundImage: 'radial-gradient(ellipse 60% 50% at 50% -10%, rgba(212,165,116,0.08) 0%, transparent 70%)',
 };
 const loginCard = {
   width: '100%', maxWidth: 380, background: 'var(--surface)', border: '1px solid var(--border2)',
@@ -143,9 +143,12 @@ const fieldInput = {
   outline: 'none', width: '100%', boxSizing: 'border-box',
 };
 const btnPrimary = {
-  width: '100%', padding: '10px 0', background: 'var(--text)', color: 'var(--bg)',
+  width: '100%', padding: '10px 0',
+  background: 'linear-gradient(180deg, var(--accent2) 0%, var(--accent) 100%)',
+  color: 'var(--accentInk)',
   border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer',
-  fontFamily: 'var(--font)', letterSpacing: '-0.01em', transition: 'opacity 0.15s',
+  fontFamily: 'var(--font)', letterSpacing: '-0.01em', transition: 'filter 0.15s',
+  boxShadow: '0 1px 0 rgba(255,255,255,0.25) inset, 0 6px 16px -8px rgba(212,165,116,0.55)',
 };
 const skipBtn = {
   width: '100%', background: 'none', border: 'none', color: 'var(--text3)',

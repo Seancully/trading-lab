@@ -56,7 +56,7 @@ export function EquityCurve({ equity }) {
         ctx.fillStyle = colorText3;
         ctx.font = '10px JetBrains Mono, monospace';
         ctx.textAlign = 'right';
-        ctx.fillText((v >= 0 ? '+' : '') + '$' + Math.round(v).toLocaleString(), pad.l - 6, y + 4);
+        ctx.fillText((v >= 0 ? '+' : '-') + '$' + Math.abs(Math.round(v)).toLocaleString(), pad.l - 6, y + 4);
       }
 
       const zeroY = yOf(0);
@@ -386,7 +386,7 @@ export function CalendarView({ byDay, trades = [], accountFilter = null }) {
                 <div className="cal-day-num" style={{ color: isToday ? 'var(--accent)' : 'var(--text2)', fontWeight: isToday ? 700 : 500 }}>{day}</div>
                 {hasTrade && inMonth ? (
                   <div className="cal-pnl" style={{ fontFamily: 'var(--mono)', fontWeight: 700, color: pnlColor }}>
-                    {pnl > 0 ? '+' : ''}${Math.round(Math.abs(pnl)).toLocaleString()}
+                    {pnl > 0 ? '+' : pnl < 0 ? '-' : ''}${Math.round(Math.abs(pnl)).toLocaleString()}
                   </div>
                 ) : inMonth ? (
                   <div title="No trades" style={{
@@ -472,7 +472,7 @@ function ModelBreakdown({ trades, accountFilter }) {
               <span style={{ display: 'flex', gap: 12, fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text2)', flexShrink: 0 }}>
                 <span>{data.count}T</span>
                 <span style={{ color: parseInt(wr) >= 50 ? 'var(--bull)' : 'var(--bear)' }}>{wr}% WR</span>
-                <span style={{ color: data.pnl >= 0 ? 'var(--bull)' : 'var(--bear)' }}>{data.pnl >= 0 ? '+' : ''}${Math.round(data.pnl)}</span>
+                <span style={{ color: data.pnl >= 0 ? 'var(--bull)' : 'var(--bear)' }}>{data.pnl >= 0 ? '+' : '-'}${Math.abs(Math.round(data.pnl))}</span>
               </span>
             </div>
             <div style={{ height: 4, background: 'var(--bg)', borderRadius: 2, overflow: 'hidden' }}>
@@ -729,7 +729,7 @@ function GradeBreakdown({ trades, accountFilter }) {
     </div>
   );
 
-  const fmtPnl = (v) => `${v >= 0 ? '+' : ''}$${Math.abs(Math.round(v)).toLocaleString()}`;
+  const fmtPnl = (v) => `${v >= 0 ? '+' : '-'}$${Math.abs(Math.round(v)).toLocaleString()}`;
 
   return (
     <div>
@@ -812,7 +812,7 @@ export default function Performance({ accountFilter }) {
 
   if (!stats) return <Empty icon="📈" title="No trade data yet" desc="Start journalling trades to see your performance metrics."/>;
 
-  const fmtPnl = (v) => `${v >= 0 ? '+' : ''}$${Math.abs(v).toLocaleString()}`;
+  const fmtPnl = (v) => `${v >= 0 ? '+' : '-'}$${Math.abs(v).toLocaleString()}`;
 
   return (
     <div>
@@ -862,7 +862,7 @@ export default function Performance({ accountFilter }) {
                 sub={`Worst: ${fmtPnl(stats.worstDay)}`}/>
             </div>
             {/* Rules score — colour matches threshold */}
-            <div className="card-glow-wrap" style={{ '--card-glow': stats.avgRulesScore >= 80 ? 'rgba(34,197,94,0.32)' : stats.avgRulesScore >= 60 ? 'rgba(122,162,247,0.32)' : 'rgba(244,63,94,0.32)' }}>
+            <div className="card-glow-wrap" style={{ '--card-glow': stats.avgRulesScore >= 80 ? 'rgba(34,197,94,0.32)' : stats.avgRulesScore >= 60 ? 'rgba(212,165,116,0.32)' : 'rgba(244,63,94,0.32)' }}>
               <StatCard label="Rules Score" value={stats.avgRulesScore !== null ? `${stats.avgRulesScore}%` : '—'}
                 color={stats.avgRulesScore >= 80 ? 'var(--bull)' : stats.avgRulesScore >= 60 ? 'var(--accent)' : 'var(--bear)'}/>
             </div>
@@ -886,7 +886,7 @@ export default function Performance({ accountFilter }) {
                 empty={<div style={{ color: 'var(--text3)', fontSize: 12, padding: 20 }}>Need 2+ trades</div>}
               />
             </div>
-            <div className="card-glow-wrap" style={{ '--card-glow': 'rgba(122,162,247,0.28)' }}>
+            <div className="card-glow-wrap" style={{ '--card-glow': 'rgba(212,165,116,0.28)' }}>
               <div className="card">
                 <div className="card-title">Entry Model Breakdown</div>
                 <ModelBreakdown trades={filtered} accountFilter={accountFilter}/>

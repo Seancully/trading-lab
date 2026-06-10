@@ -138,7 +138,7 @@ function PnlChip({ value, label, scale = 1 }) {
       <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text3)' }}>{label}</div>
       <div style={{ fontFamily: 'var(--mono)', fontSize: numSize, fontWeight: 700,
         color: pos ? 'var(--bull)' : neg ? 'var(--bear)' : 'var(--be)' }}>
-        {value >= 0 ? '+' : ''}${Math.abs(value).toLocaleString()}
+        {value > 0 ? '+' : value < 0 ? '-' : '+'}${Math.abs(value).toLocaleString()}
       </div>
     </div>
   );
@@ -239,7 +239,7 @@ function Dashboard({ onNav, accountFilter }) {
             const glowMap = {
               'var(--bull)':   'rgba(34,197,94,0.32)',
               'var(--bear)':   'rgba(244,63,94,0.32)',
-              'var(--accent)': 'rgba(122,162,247,0.30)',
+              'var(--accent)': 'rgba(212,165,116,0.30)',
             };
             const glow = glowMap[s.barColor] || 'rgba(148,163,184,0.16)';
             return (
@@ -279,8 +279,8 @@ function Dashboard({ onNav, accountFilter }) {
           </div>
         </div>
 
-        {/* Recent trades — accent blue glow */}
-        <div className="card-glow-wrap" style={{ '--card-glow': 'rgba(122,162,247,0.18)', display: 'flex', flexDirection: 'column' }}>
+        {/* Recent trades — accent gold glow */}
+        <div className="card-glow-wrap" style={{ '--card-glow': 'rgba(212,165,116,0.18)', display: 'flex', flexDirection: 'column' }}>
           <div className="card" style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div className="card-title" style={{ margin: 0 }}>Recent Trades</div>
