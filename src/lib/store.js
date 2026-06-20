@@ -718,77 +718,118 @@ export const Store = {
     const bes = weekTrades.filter(t => t.result === 'BE').length;
     const totalPnl = weekTrades.reduce((s, t) => s + (Number(t.pnlDollars) || 0), 0);
     const winRate = weekTrades.length ? Math.round((wins / weekTrades.length) * 100) : 0;
-    const byDay = {};
-    for (const t of weekTrades) byDay[t.date] = (byDay[t.date] || 0) + (Number(t.pnlDollars) || 0);
-    const dayVals = Object.values(byDay);
-    const bestDay = dayVals.length ? Math.max(...dayVals) : 0;
-    const worstDay = dayVals.length ? Math.min(...dayVals) : 0;
-    const byModel = {};
-    for (const t of weekTrades) {
-      const m = t.entryModel || 'Other';
-      byModel[m] = (byModel[m] || 0) + 1;
-    }
-    const topModels = Object.entries(byModel).sort((a, b) => b[1] - a[1]).slice(0, 3);
-
-    // Most-skipped rules across this week's rules-scored trades.
-    const scoredTrades = weekTrades.filter(t => (t.rulesScore || 0) > 0);
     const allRules = (this.getRules() || []).flatMap(cat => cat.rules.map(r => ({ ...r, category: cat.category })));
-    const skipCounts = {};
-    for (const r of allRules) skipCounts[r.id] = { rule: r, skipped: 0 };
-    for (const t of scoredTrades) {
-      const checks = t.rulesChecklist || {};
-      for (const r of allRules) {
-        if (!checks[r.id]) skipCounts[r.id].skipped++;
-      }
-    }
-    const topSkipped = Object.values(skipCounts)
-      .filter(x => x.skipped > 0)
-      .sort((a, b) => b.skipped - a.skipped)
-      .slice(0, 5);
 
-    const fmt = (v) => `${v >= 0 ? '+' : '-'}$${Math.abs(Math.round(v)).toLocaleString()}`;
+    const fmt  = (v) => `${v >= 0 ? '+' : '-'}$${Math.abs(Math.round(v)).toLocaleString()}`;
+    const fmtR = (v) => `${v >= 0 ? '+' : ''}${Number(v || 0).toFixed(2)}R`;
+    const esc  = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const monthName = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const endName = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-    // Build a color-coded stats summary line using HTML spans
-    const pnlColor   = totalPnl > 0 ? '#22c55e' : totalPnl < 0 ? '#f43f5e' : '#94a3b8';
-    const winColor   = '#22c55e';
-    const lossColor  = '#f43f5e';
-    const beColor    = '#f59e0b';
-    const statsHtml  = [
+    const GREEN = '#22c55e', RED = '#f43f5e', BE_C = '#f59e0b', MUTED = 'var(--text3)';
+
+    // Build the color-coded stats summary line (kept at the very top).
+    const pnlColor = totalPnl > 0 ? GREEN : totalPnl < 0 ? RED : '#94a3b8';
+    const statsHtml = [
       `<span style="color:var(--text2);font-weight:600">${weekTrades.length} trade${weekTrades.length === 1 ? '' : 's'}</span>`,
-      wins   > 0 ? `<span style="color:${winColor};font-weight:700">${wins}W</span>`    : `<span style="font-weight:600">${wins}W</span>`,
-      losses > 0 ? `<span style="color:${lossColor};font-weight:700">${losses}L</span>` : `<span style="font-weight:600">${losses}L</span>`,
-      bes    > 0 ? `<span style="color:${beColor};font-weight:700">${bes}BE</span>`      : `<span style="font-weight:600">${bes}BE</span>`,
+      wins   > 0 ? `<span style="color:${GREEN};font-weight:700">${wins}W</span>`  : `<span style="font-weight:600">${wins}W</span>`,
+      losses > 0 ? `<span style="color:${RED};font-weight:700">${losses}L</span>`  : `<span style="font-weight:600">${losses}L</span>`,
+      bes    > 0 ? `<span style="color:${BE_C};font-weight:700">${bes}BE</span>`    : `<span style="font-weight:600">${bes}BE</span>`,
       `<span style="color:var(--text3);font-weight:600">${winRate}% WR</span>`,
       `<span style="color:${pnlColor};font-weight:700">${fmt(totalPnl)}</span>`,
     ].join('<span style="color:var(--text3);font-weight:600"> · </span>');
 
-    const blocks = [
-      { id: uid(), type: 'p',   text: statsHtml },
-      { id: uid(), type: 'h2',  text: 'THE NUMBERS' },
-      { id: uid(), type: 'li',  text: `Total P&L: ${fmt(totalPnl)}` },
-      { id: uid(), type: 'li',  text: `Best day: ${fmt(bestDay)} · Worst day: ${fmt(worstDay)}` },
-      { id: uid(), type: 'li',  text: `Top models: ${topModels.length ? topModels.map(([m, c]) => `${m} (${c})`).join(', ') : '—'}` },
-      { id: uid(), type: 'h2',  text: '<span style="color:#22c55e">WHAT WORKED</span>' },
-      { id: uid(), type: 'p',   text: '' },
-      { id: uid(), type: 'h2',  text: '<span style="color:#f43f5e">WHAT DIDN\'T</span>' },
-      { id: uid(), type: 'p',   text: '' },
-      { id: uid(), type: 'h2',  text: 'LESSONS' },
-      { id: uid(), type: 'li',  text: '' },
-      { id: uid(), type: 'li',  text: '' },
-      { id: uid(), type: 'h2',  text: 'ADJUSTMENTS FOR NEXT WEEK' },
-      { id: uid(), type: 'li',  text: '' },
-      { id: uid(), type: 'h2',  text: 'MOST-SKIPPED RULES' },
-      ...(topSkipped.length
-        ? topSkipped.map(({ rule, skipped: count }) => ({
-            id: uid(), type: 'li',
-            text: `${rule.category} — ${rule.text} (${count}/${scoredTrades.length})`,
-          }))
-        : [{ id: uid(), type: 'li', text: scoredTrades.length === 0
-            ? 'No rules-scored trades this week.'
-            : 'Clean week — every rule on every trade.' }]),
-    ];
+    // Auto-derive 1–2 "what worked" and 1–2 "what to fix" points per trade,
+    // from the structured data the trade already carries (result / R / grade /
+    // rule adherence / confluence) plus the user's own grade note & lesson.
+    const reviewPoints = (t) => {
+      const good = [], bad = [];
+      const r = Number(t.rMultiple) || 0;
+      const score = t.rulesScore || 0;
+      const checks = t.rulesChecklist || {};
+      const skipped = allRules.filter(rule => !checks[rule.id]);
+      const conf = Array.isArray(t.confluences) ? t.confluences : [];
+      const note = (t.gradeNote || '').trim();
+      const lesson = (t.lesson || '').trim();
+
+      if (t.result === 'Win') {
+        good.push(r >= 2 ? `Let the winner run to ${fmtR(r)}` : `Closed green at ${fmtR(r)}`);
+        if (score > 0 && score < 70) bad.push(`Won on only ${score}% rule adherence — don't reward sloppiness`);
+      } else if (t.result === 'BE') {
+        good.push('Scratched to breakeven — capital protected');
+      } else if (t.result === 'Loss') {
+        bad.push(`Loss taken at ${fmtR(r)}`);
+        if (score >= 90) good.push(`Followed the plan (${score}% rules) — loss was just variance`);
+      }
+
+      if (t.grade === 'A+' || t.grade === 'A') {
+        good.push(note ? `${t.grade} execution — ${note}` : `${t.grade} execution`);
+      } else if (t.grade === 'C' || t.grade === 'D') {
+        bad.push(note ? `Graded ${t.grade} — ${note}` : `Graded ${t.grade} — execution slipped`);
+      } else if (note) {
+        (t.result === 'Loss' ? bad : good).push(note);
+      }
+
+      if (score >= 90 && t.result !== 'Loss') good.push(`${score}% rule adherence`);
+      else if (score > 0 && score < 70 && t.result !== 'Win') {
+        bad.push(skipped.length ? `Skipped rule: ${skipped[0].text}` : `Low rule adherence (${score}%)`);
+      }
+
+      if (conf.length >= 3) good.push(`Stacked confluence: ${conf.slice(0, 3).join(', ')}`);
+
+      if (lesson) {
+        const first = lesson.split('\n')[0];
+        if (t.result === 'Loss') { if (!bad.includes(first)) bad.push(first); }
+        else { if (!good.includes(first)) good.push(first); }
+      }
+
+      // De-dupe and cap at 2 each.
+      return { good: [...new Set(good)].slice(0, 2), bad: [...new Set(bad)].slice(0, 2) };
+    };
+
+    // Group the week's trades by day (Mon→Sun), each day's trades by time.
+    const byDay = {};
+    for (const t of weekTrades) (byDay[t.date] = byDay[t.date] || []).push(t);
+    const dayKeys = Object.keys(byDay).sort();
+
+    const dayLabel = (dk) =>
+      new Date(dk + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+
+    const blocks = [{ id: uid(), type: 'p', text: statsHtml }];
+
+    if (!weekTrades.length) {
+      blocks.push({ id: uid(), type: 'bq', text: 'No trades logged this week. Log trades in the Journal, then regenerate this review.' });
+    }
+
+    for (const dk of dayKeys) {
+      const dayTrades = byDay[dk].slice().sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+      const dayPnl = dayTrades.reduce((s, t) => s + (Number(t.pnlDollars) || 0), 0);
+      const dayColor = dayPnl > 0 ? GREEN : dayPnl < 0 ? RED : MUTED;
+
+      blocks.push({ id: uid(), type: 'hr', text: '' });
+      blocks.push({
+        id: uid(), type: 'h2',
+        text: `${esc(dayLabel(dk))}`
+          + `<span style="color:${MUTED};font-weight:600">&nbsp;&nbsp;·&nbsp;&nbsp;</span>`
+          + `<span style="color:${dayColor};font-weight:700">${fmt(dayPnl)}</span>`
+          + `<span style="color:${MUTED};font-weight:600">&nbsp;·&nbsp;${dayTrades.length} trade${dayTrades.length === 1 ? '' : 's'}</span>`,
+      });
+
+      for (const t of dayTrades) {
+        const resColor = t.result === 'Win' ? GREEN : t.result === 'Loss' ? RED : BE_C;
+        const head = [t.time || '', [t.instrument, t.direction].filter(Boolean).join(' '), t.entryModel || '']
+          .filter(Boolean).join(' · ');
+        const resTag = `<span style="color:${resColor};font-weight:700">${t.result || '—'} · ${fmtR(t.rMultiple)} · ${fmt(Number(t.pnlDollars) || 0)}</span>`;
+
+        blocks.push({ id: uid(), type: 'h3', text: `${esc(head)}<span style="color:${MUTED};font-weight:600">&nbsp;&nbsp;</span>${resTag}` });
+        blocks.push({ id: uid(), type: 'img', imageUrl: t.screenshotUrl || '', text: '' });
+
+        const { good, bad } = reviewPoints(t);
+        for (const g of good) blocks.push({ id: uid(), type: 'p', text: `<span style="color:${GREEN};font-weight:700">✓</span>&nbsp;&nbsp;${esc(g)}` });
+        for (const b of bad)  blocks.push({ id: uid(), type: 'p', text: `<span style="color:${RED};font-weight:700">✗</span>&nbsp;&nbsp;${esc(b)}` });
+        if (!good.length && !bad.length) blocks.push({ id: uid(), type: 'p', text: '' });
+      }
+    }
 
     const note = {
       id: uid(),
