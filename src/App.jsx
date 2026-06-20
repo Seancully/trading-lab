@@ -144,6 +144,118 @@ function PnlChip({ value, label, scale = 1 }) {
   );
 }
 
+// ── Killzone clock ───────────────────────────────────────────────────────────
+// Live NY time with the active ICT killzone lit and a countdown to the next
+// macro window. The one thing worth glancing at every session.
+const KZ_ZONES = [
+  { id: 'Asia',   start: 20 * 60,      end: 24 * 60 },
+  { id: 'London', start: 2 * 60,       end: 5 * 60 },
+  { id: 'NY AM',  start: 7 * 60,       end: 10 * 60 },
+  { id: 'Lunch',  start: 12 * 60,      end: 13 * 60 },
+  { id: 'NY PM',  start: 13 * 60 + 30, end: 16 * 60 },
+];
+const KZ_MACROS = [
+  [8 * 60 + 50, 9 * 60 + 10],
+  [9 * 60 + 50, 10 * 60 + 10],
+  [10 * 60 + 50, 11 * 60 + 10],
+  [13 * 60 + 10, 13 * 60 + 40],
+  [15 * 60 + 15, 15 * 60 + 45],
+];
+
+function nyParts() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', hour12: false,
+    hour: '2-digit', minute: '2-digit', second: '2-digit', weekday: 'short',
+  }).formatToParts(new Date());
+  const get = (t) => parts.find(p => p.type === t)?.value || '0';
+  return { h: Number(get('hour')) % 24, m: Number(get('minute')), s: Number(get('second')), wd: get('weekday') };
+}
+
+function KillzoneClock() {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const { h, m, s, wd } = nyParts();
+  const cur = h * 60 + m;
+  const weekend = wd === 'Sat' || wd === 'Sun';
+  const pad = (n) => String(n).padStart(2, '0');
+  const clock = `${pad(h)}:${pad(m)}:${pad(s)}`;
+  const activeZone = weekend ? null : KZ_ZONES.find(z => cur >= z.start && cur < z.end)?.id;
+
+  let macro = null; // { live: true, mins } | { live: false, mins } | null
+  if (!weekend) {
+    for (const [a, b] of KZ_MACROS) {
+      if (cur >= a && cur < b) { macro = { live: true, mins: b - cur }; break; }
+      if (cur < a) { macro = { live: false, mins: a - cur }; break; }
+    }
+  }
+  const fmtMins = (n) => n >= 60 ? `${Math.floor(n / 60)}h ${n % 60}m` : `${n}m`;
+
+  return (
+    <div className="kz-bar">
+      <div className="kz-now">
+        <span className="kz-dot" style={{ background: weekend ? 'var(--text3)' : activeZone ? 'var(--accent)' : 'var(--bull)' }}/>
+        <span className="kz-clock">{clock}<span className="kz-tz">NY</span></span>
+      </div>
+      <div className="kz-track">
+        {KZ_ZONES.map(z => (
+          <div key={z.id} className={`kz-seg ${z.id === activeZone ? 'active' : ''}`}>{z.id}</div>
+        ))}
+      </div>
+      {weekend ? (
+        <div className="kz-macro"><span className="kz-macro-dot"/>Markets closed</div>
+      ) : macro ? (
+        <div className={`kz-macro ${macro.live ? 'live' : ''}`}>
+          <span className="kz-macro-dot"/>
+          {macro.live ? `Macro live · ${fmtMins(macro.mins)} left` : `Macro in ${fmtMins(macro.mins)}`}
+        </div>
+      ) : (
+        <div className="kz-macro"><span className="kz-macro-dot"/>No macro ahead</div>
+      )}
+    </div>
+  );
+}
+
+// ── Skeleton boot screen ─────────────────────────────────────────────────────
+function SkeletonBoot() {
+  const Bar = ({ w, h = 11 }) => <div className="skeleton" style={{ width: w, height: h }}/>;
+  return (
+    <div className="app-layout">
+      <nav className="topnav">
+        <div className="topnav-row row-top" style={{ gap: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--wordmark)' }}>Trading Lab</div>
+          <div style={{ flex: 1 }}/>
+          <Bar w={120} h={28}/>
+          <div className="skeleton" style={{ width: 26, height: 26, borderRadius: '50%' }}/>
+        </div>
+        <div className="topnav-row row-bottom" style={{ gap: 8 }}>
+          {Array.from({ length: 6 }).map((_, i) => <Bar key={i} w={76} h={24}/>)}
+        </div>
+      </nav>
+      <main className="main">
+        <div className="main-content" style={{ paddingTop: 24 }}>
+          <div className="skeleton-card" style={{ height: 76, marginBottom: 18 }}/>
+          <div className="skeleton-card" style={{ height: 56, marginBottom: 18 }}/>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 20 }}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="skeleton-card" style={{ height: 104 }}>
+                <Bar w="55%" h={9}/><Bar w="70%" h={26}/><Bar w="45%" h={9}/>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(280px, 380px)', gap: 16 }}>
+            <div className="skeleton-card" style={{ height: 280 }}/>
+            <div className="skeleton-card" style={{ height: 280 }}/>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
 function Dashboard({ onNav, accountFilter }) {
   const allTrades = useMemo(() => Store.getTrades(), []);
   const trades = useMemo(() => applyAccountFilter(allTrades, accountFilter), [allTrades, accountFilter]);
@@ -183,6 +295,8 @@ function Dashboard({ onNav, accountFilter }) {
           <Btn variant="primary" onClick={() => onNav('journal')}><Icon name="plus" size={13}/>Log Trade</Btn>
         </div>
       </div>
+
+      <KillzoneClock />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginBottom: 20 }}>
         {[
@@ -609,12 +723,7 @@ export default function App() {
   };
 
   if (authState === 'loading') {
-    return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', flexDirection: 'column', gap: 14 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: 'var(--wordmark)' }}>Trading Lab</div>
-        <div className="spinner"/>
-      </div>
-    );
+    return <SkeletonBoot />;
   }
 
   if (authState === 'login') {

@@ -1975,3 +1975,97 @@ body.light .form-select option { background: #ffffff; color: #171310; }
 }
 body.light .topnav-quote { color: var(--accent2); box-shadow: 0 0 0 1px rgba(166,118,47,0.12) inset; }
 @media (max-width: 720px) { .topnav-quote { display: none; } }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PREMIUM POLISH — skeletons · entrance choreography · killzone clock
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Shimmer skeletons ──────────────────────────────────────────────────── */
+@keyframes tlShimmer { 0% { background-position: -340px 0; } 100% { background-position: 340px 0; } }
+.skeleton {
+  background: linear-gradient(90deg, var(--surface2) 0px, var(--surface3) 100px, var(--surface2) 200px);
+  background-size: 340px 100%;
+  animation: tlShimmer 1.3s infinite linear;
+  border-radius: var(--radius-sm);
+}
+.skeleton-card {
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg); padding: 18px;
+  display: flex; flex-direction: column; gap: 12px;
+  backdrop-filter: blur(14px) saturate(135%);
+  -webkit-backdrop-filter: blur(14px) saturate(135%);
+}
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+
+/* ── Stat-card entrance choreography ────────────────────────────────────── */
+/* Opacity-only so the lingering animation state never overrides :hover lift.
+   Scoped to dashboard + performance where cards update in place (no remount on
+   filter), so it fires once per page entry rather than on every keystroke. */
+@keyframes statIn { from { opacity: 0; } to { opacity: 1; } }
+.main-content[data-page="dashboard"] .stat-card,
+.main-content[data-page="performance"] .stat-card {
+  animation: statIn 0.5s ease both;
+}
+.main-content[data-page="dashboard"] .stat-card:nth-child(1),
+.main-content[data-page="performance"] .stat-card:nth-child(1) { animation-delay: 0.04s; }
+.main-content[data-page="dashboard"] .stat-card:nth-child(2),
+.main-content[data-page="performance"] .stat-card:nth-child(2) { animation-delay: 0.10s; }
+.main-content[data-page="dashboard"] .stat-card:nth-child(3),
+.main-content[data-page="performance"] .stat-card:nth-child(3) { animation-delay: 0.16s; }
+.main-content[data-page="dashboard"] .stat-card:nth-child(4),
+.main-content[data-page="performance"] .stat-card:nth-child(4) { animation-delay: 0.22s; }
+.main-content[data-page="dashboard"] .stat-card:nth-child(5),
+.main-content[data-page="performance"] .stat-card:nth-child(5) { animation-delay: 0.28s; }
+.main-content[data-page="dashboard"] .stat-card:nth-child(6),
+.main-content[data-page="performance"] .stat-card:nth-child(6) { animation-delay: 0.34s; }
+@media (prefers-reduced-motion: reduce) {
+  .main-content[data-page="dashboard"] .stat-card,
+  .main-content[data-page="performance"] .stat-card { animation: none; }
+}
+
+/* ── Killzone clock (dashboard) ─────────────────────────────────────────── */
+.kz-bar {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 12px 16px; margin-bottom: 18px;
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  box-shadow: 0 1px 0 var(--glass-highlight) inset, 0 8px 24px -16px rgba(0,0,0,0.6);
+}
+.kz-now { display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+.kz-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bull); }
+.kz-clock {
+  font-family: var(--mono); font-size: 20px; font-weight: 600;
+  letter-spacing: -0.01em; line-height: 1; color: var(--text);
+}
+.kz-clock .kz-tz { font-size: 11px; color: var(--text3); margin-left: 4px; font-weight: 500; }
+.kz-track { display: flex; gap: 4px; flex: 1; min-width: 240px; }
+.kz-seg {
+  flex: 1; text-align: center; font-size: 10px; font-weight: 600;
+  padding: 6px 4px; border-radius: 8px;
+  background: var(--surface2); color: var(--text3);
+  border: 1px solid transparent; white-space: nowrap;
+  letter-spacing: 0.04em; transition: all 0.2s;
+}
+.kz-seg.active {
+  background: var(--accentDim); color: var(--accent);
+  border-color: var(--accentBorder);
+  box-shadow: 0 0 18px -4px var(--accentBorder), 0 1px 0 var(--glass-highlight) inset;
+}
+.kz-macro {
+  display: flex; align-items: center; gap: 7px; flex-shrink: 0;
+  font-size: 11px; color: var(--text2);
+  padding: 5px 11px; border-radius: 999px;
+  border: 1px solid var(--border2); background: var(--surface);
+}
+.kz-macro.live {
+  color: var(--bull); border-color: rgba(34,197,94,0.30); background: var(--bullDim);
+}
+.kz-macro .kz-macro-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.kz-macro.live .kz-macro-dot { animation: syncPulse 1.6s ease-out infinite; }
+@media (max-width: 720px) {
+  .kz-bar { gap: 10px; padding: 10px 12px; }
+  .kz-track { order: 3; width: 100%; flex-basis: 100%; }
+  .kz-clock { font-size: 17px; }
+}

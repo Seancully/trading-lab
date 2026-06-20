@@ -8,6 +8,8 @@ import { toast } from '../lib/toast.js';
 export function EquityCurve({ equity }) {
   const canvasRef = useRef();
   const pointsRef = useRef([]);
+  const animatedRef = useRef(false);
+  const animRef = useRef(0);
   const [hoverIdx, setHoverIdx] = useState(null);
   const [hoverPoint, setHoverPoint] = useState(null);
 
@@ -16,18 +18,18 @@ export function EquityCurve({ equity }) {
     if (!canvas || !equity.length) return;
     let cancelled = false;
 
-    const draw = () => {
+    const draw = (progress = 1) => {
       if (cancelled) return;
       const W = canvas.offsetWidth, H = canvas.offsetHeight;
-      if (!W || !H) { requestAnimationFrame(draw); return; }
+      if (!W || !H) { requestAnimationFrame(() => draw(progress)); return; }
       const ctx = canvas.getContext('2d');
       const dpr = window.devicePixelRatio || 1;
       canvas.width = W * dpr; canvas.height = H * dpr;
       ctx.scale(dpr, dpr);
-      paint(ctx, W, H);
+      paint(ctx, W, H, progress);
     };
 
-    const paint = (ctx, W, H) => {
+    const paint = (ctx, W, H, progress) => {
       const pad = { t: 16, r: 16, b: 32, l: 56 };
       const cw = W - pad.l - pad.r, ch = H - pad.t - pad.b;
 
@@ -43,6 +45,7 @@ export function EquityCurve({ equity }) {
       const colorBear = style.getPropertyValue('--bearStroke').trim() || '#EF4444';
       const colorText3 = style.getPropertyValue('--text3').trim() || '#404060';
       const colorBorder = style.getPropertyValue('--border2').trim() || 'rgba(255,255,255,0.10)';
+      const colorAccent = style.getPropertyValue('--accent').trim() || '#D4A574';
 
       ctx.clearRect(0, 0, W, H);
 
@@ -69,40 +72,60 @@ export function EquityCurve({ equity }) {
       if (equity.length < 2) return;
 
       const lastVal = equity[equity.length - 1].value;
+      const lineColor = lastVal >= 0 ? colorBull : colorBear;
+      const lineRgb = lastVal >= 0 ? '34,197,94' : '239,68,68';
+
+      const tracePath = () => {
+        ctx.beginPath();
+        ctx.moveTo(xOf(0), yOf(equity[0].value));
+        for (let i = 1; i < equity.length; i++) {
+          const x0 = xOf(i - 1), y0 = yOf(equity[i - 1].value);
+          const x1 = xOf(i), y1 = yOf(equity[i].value);
+          const mx = (x0 + x1) / 2;
+          ctx.bezierCurveTo(mx, y0, mx, y1, x1, y1);
+        }
+      };
+
+      // Area fill — fades in with the draw-on progress.
       const grad = ctx.createLinearGradient(0, pad.t, 0, pad.t + ch);
       if (lastVal >= 0) {
-        grad.addColorStop(0, 'rgba(34,197,94,0.16)');
+        grad.addColorStop(0, 'rgba(34,197,94,0.18)');
         grad.addColorStop(1, 'rgba(34,197,94,0.01)');
       } else {
         grad.addColorStop(0, 'rgba(239,68,68,0.01)');
-        grad.addColorStop(1, 'rgba(239,68,68,0.16)');
+        grad.addColorStop(1, 'rgba(239,68,68,0.18)');
       }
-
-      ctx.beginPath();
-      ctx.moveTo(xOf(0), yOf(equity[0].value));
-      for (let i = 1; i < equity.length; i++) {
-        const x0 = xOf(i - 1), y0 = yOf(equity[i - 1].value);
-        const x1 = xOf(i), y1 = yOf(equity[i].value);
-        const mx = (x0 + x1) / 2;
-        ctx.bezierCurveTo(mx, y0, mx, y1, x1, y1);
-      }
+      ctx.save();
+      ctx.globalAlpha = progress;
+      tracePath();
       ctx.lineTo(xOf(equity.length - 1), pad.t + ch);
       ctx.lineTo(xOf(0), pad.t + ch);
       ctx.closePath();
       ctx.fillStyle = grad;
       ctx.fill();
+      ctx.restore();
 
-      ctx.beginPath();
-      ctx.moveTo(xOf(0), yOf(equity[0].value));
-      for (let i = 1; i < equity.length; i++) {
-        const x0 = xOf(i - 1), y0 = yOf(equity[i - 1].value);
-        const x1 = xOf(i), y1 = yOf(equity[i].value);
-        const mx = (x0 + x1) / 2;
-        ctx.bezierCurveTo(mx, y0, mx, y1, x1, y1);
-      }
-      ctx.strokeStyle = lastVal >= 0 ? colorBull : colorBear;
-      ctx.lineWidth = 2;
+      // Main line — soft glow + left-to-right draw-on via dashed reveal.
+      const approxLen = (() => {
+        let L = 0;
+        for (let i = 1; i < equity.length; i++) {
+          const dx = xOf(i) - xOf(i - 1), dy = yOf(equity[i].value) - yOf(equity[i - 1].value);
+          L += Math.hypot(dx, dy);
+        }
+        return L * 1.25 + 4;
+      })();
+      ctx.save();
+      ctx.shadowColor = `rgba(${lineRgb},0.45)`;
+      ctx.shadowBlur = 12;
+      ctx.strokeStyle = lineColor;
+      ctx.lineWidth = 2.25;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.setLineDash([approxLen, approxLen]);
+      ctx.lineDashOffset = approxLen * (1 - progress);
+      tracePath();
       ctx.stroke();
+      ctx.restore();
 
       const points = equity.map((p, i) => {
         const x = xOf(i);
@@ -112,19 +135,51 @@ export function EquityCurve({ equity }) {
       });
       pointsRef.current = points;
 
+      // Reveal dots only up to the draw-on frontier so they appear with the line.
+      const frontierX = pad.l + cw * progress;
+      ctx.save();
+      ctx.globalAlpha = progress;
       for (let i = 0; i < points.length; i++) {
         const { x, y, value } = points[i];
+        if (x > frontierX + 1) continue;
         ctx.beginPath();
         ctx.arc(x, y, 3, 0, Math.PI * 2);
         ctx.fillStyle = value >= 0 ? colorBull : colorBear;
         ctx.fill();
       }
+      ctx.restore();
 
+      // Personal-best marker — gold ring on the equity peak (only if in profit).
+      if (maxV > 0) {
+        let peakIdx = 0;
+        for (let i = 1; i < equity.length; i++) if (equity[i].value > equity[peakIdx].value) peakIdx = i;
+        const pk = points[peakIdx];
+        if (pk && pk.x <= frontierX + 1) {
+          ctx.save();
+          ctx.globalAlpha = progress;
+          ctx.beginPath(); ctx.arc(pk.x, pk.y, 7, 0, Math.PI * 2);
+          ctx.strokeStyle = colorAccent; ctx.lineWidth = 2;
+          ctx.shadowColor = 'rgba(212,165,116,0.6)'; ctx.shadowBlur = 10;
+          ctx.stroke();
+          ctx.beginPath(); ctx.arc(pk.x, pk.y, 3, 0, Math.PI * 2);
+          ctx.fillStyle = colorAccent; ctx.fill();
+          ctx.restore();
+        }
+      }
+
+      // Hover crosshair + accented ring.
       if (hoverIdx !== null && points[hoverIdx]) {
         const { x, y, delta } = points[hoverIdx];
-        ctx.strokeStyle = delta >= 0 ? colorBull : colorBear;
+        ctx.save();
+        ctx.strokeStyle = colorBorder;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 4]);
+        ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, pad.t + ch); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.strokeStyle = delta >= 0 ? colorBull : delta < 0 ? colorBear : colorText3;
         ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
       }
 
       const dateIdxs = [0, Math.floor(equity.length / 3), Math.floor(equity.length * 2 / 3), equity.length - 1]
@@ -135,10 +190,25 @@ export function EquityCurve({ equity }) {
       for (const i of dateIdxs) ctx.fillText((equity[i].date || '').slice(5), xOf(i), H - 8);
     };
 
-    draw();
-    const ro = new ResizeObserver(draw);
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (!animatedRef.current && hoverIdx === null && equity.length >= 2 && !reduce) {
+      animatedRef.current = true;
+      const start = performance.now();
+      const dur = 900;
+      const loop = (now) => {
+        if (cancelled) return;
+        const t = Math.min(1, (now - start) / dur);
+        draw(1 - Math.pow(1 - t, 3));
+        if (t < 1) animRef.current = requestAnimationFrame(loop);
+      };
+      animRef.current = requestAnimationFrame(loop);
+    } else {
+      draw(1);
+    }
+
+    const ro = new ResizeObserver(() => draw(1));
     ro.observe(canvas);
-    return () => { cancelled = true; ro.disconnect(); };
+    return () => { cancelled = true; cancelAnimationFrame(animRef.current); ro.disconnect(); };
   }, [equity, hoverIdx]);
 
   useEffect(() => {

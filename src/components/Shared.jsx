@@ -235,10 +235,27 @@ export function Sep({ label }) {
   return <div className="section-sep"><span>{label}</span></div>;
 }
 
+// Line-art empty-state glyphs, keyed by the emoji each call site used to pass —
+// so existing <Empty icon="📈"/> calls upgrade to gold line-art with no churn.
+const EMPTY_GLYPHS = {
+  '📈': <path d="M3 17l5-6 4 3 5-7 4 4" strokeWidth="1.5" stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round"/>,
+  '📊': <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" strokeWidth="1.5" stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round"/></>,
+  '📋': <path d="M9 4H7a2 2 0 00-2 2v13a2 2 0 002 2h10a2 2 0 002-2V6a2 2 0 00-2-2h-2M9 4a2 2 0 002 2h2a2 2 0 002-2M9 4a2 2 0 012-2h2a2 2 0 012 2M9 12l2 2 4-4" strokeWidth="1.5" stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round"/>,
+  '✓': <><circle cx="9" cy="12" r="6" stroke="currentColor" strokeWidth="1.5" fill="none"/><circle cx="15" cy="12" r="6" stroke="currentColor" strokeWidth="1.5" fill="none"/></>,
+  '📝': <path d="M11 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2v-5m-1.5-9.5a2.12 2.12 0 113 3L12 17l-4 1 1-4 9.5-9.5z" strokeWidth="1.5" stroke="currentColor" fill="none" strokeLinecap="round" strokeLinejoin="round"/>,
+};
+
 export function Empty({ icon = '📋', title, desc, action }) {
+  const glyph = EMPTY_GLYPHS[icon];
   return (
     <div className="empty-state">
-      <div className="empty-icon">{icon}</div>
+      {glyph ? (
+        <div className="empty-illustration">
+          <svg width="34" height="34" viewBox="0 0 24 24">{glyph}</svg>
+        </div>
+      ) : (
+        <div className="empty-icon">{icon}</div>
+      )}
       <h3>{title}</h3>
       {desc && <p>{desc}</p>}
       {action && <div style={{ marginTop: 16 }}>{action}</div>}
