@@ -3,6 +3,7 @@
 // only ever reads/writes their own rows.
 
 import { supabase, supabaseConfigured } from './supabase.js';
+import { initImageCache, hydrate, dehydrate, flushImageWrites, clearImageCache } from './imageStore.js';
 
 const KEYS = {
   trades: 'tl_trades',
@@ -378,7 +379,8 @@ export const Sync = {
         }
         const deduped = [...lfSeen.values()];
         const keptIds = new Set(deduped.map(t => t.id));
-        localStorage.setItem(KEYS.trades, JSON.stringify(deduped));
+        // Store ref-bearing copies locally; push the full data-URL copies remotely.
+        localStorage.setItem(KEYS.trades, JSON.stringify(deduped.map(dehydrate)));
         for (const t of deduped) {
           if (!remoteMap[t.id]) await this._immediatePush('trade_' + t.id, t);
         }
@@ -426,7 +428,7 @@ export const Sync = {
           local.filter(n => n.id && !noteTombstoneSet.has(n.id)).map(n => [n.id, n])
         );
         const merged = Object.values({ ...remoteMap, ...localMap });
-        localStorage.setItem(KEYS.notes, JSON.stringify(merged));
+        localStorage.setItem(KEYS.notes, JSON.stringify(merged.map(dehydrate)));
         for (const n of merged) {
           if (!remoteMap[n.id]) await this._immediatePush('note_' + n.id, n);
         }
@@ -552,8 +554,10 @@ export const Store = {
         out.push(t);
       }
     }
+    // `out` holds the raw localStorage shape (image fields are idb: refs).
+    // Persist the raw form; hydrate refs → data URLs only for the returned copy.
     if (mutated) localStorage.setItem(KEYS.trades, JSON.stringify(out));
-    return out;
+    return out.map(hydrate);
   },
   loadSampleTrades() {
     const s = makeSample();
@@ -591,7 +595,7 @@ export const Store = {
   // tombstones their ids so they can't be resurrected by a stale sync from
   // another device that still has them in localStorage.
   async removeSampleTrades() {
-    const all = this.getTrades();
+    const all = read(KEYS.trades, []); // raw — sample detection uses metadata only
     const samples = all.filter(t => this.isSampleTrade(t));
     if (!samples.length) return { removed: 0 };
     const keep = all.filter(t => !this.isSampleTrade(t));
@@ -846,18 +850,22 @@ export const Store = {
     return note.id;
   },
   saveTrade(trade) {
-    const trades = this.getTrades();
+    // Work against the raw (ref-bearing) array so we don't re-process every
+    // other trade's image. Only the incoming trade is dehydrated (its inline
+    // screenshot moves to IndexedDB and becomes a ref in localStorage).
+    const trades = read(KEYS.trades, []);
+    const stored = dehydrate(trade);
     const idx = trades.findIndex(t => t.id === trade.id);
-    if (idx >= 0) trades[idx] = trade; else trades.unshift(trade);
+    if (idx >= 0) trades[idx] = stored; else trades.unshift(stored);
     localStorage.setItem(KEYS.trades, JSON.stringify(trades));
-    Sync.push('trade_' + trade.id, trade);
-    return trades;
+    Sync.push('trade_' + trade.id, trade); // push the full image data URL — unchanged
+    return this.getTrades();
   },
   deleteTrade(idOrTrade) {
     // Accepts a trade id (string) or a full trade object. The object form
     // gives us a fingerprint to tombstone, which makes the deletion stick
     // across devices even when each one has its own id for the same record.
-    const all = this.getTrades(); // normalized — every trade has an id
+    const all = read(KEYS.trades, []); // raw (ref-bearing) — metadata intact for fp
     let id = typeof idOrTrade === 'string' ? idOrTrade : idOrTrade?.id;
     let target = typeof idOrTrade === 'object' ? idOrTrade : null;
     if (!id && target) {
@@ -873,11 +881,11 @@ export const Store = {
       target = all.find(t => t.id === id) || null;
     }
     const next = id ? all.filter(t => t.id !== id) : all;
-    localStorage.setItem(KEYS.trades, JSON.stringify(next));
+    localStorage.setItem(KEYS.trades, JSON.stringify(next)); // raw refs — no bloat
     const fp = target ? tradeFingerprint(target) : null;
     this._tombstoneTrade(id, fp);
     if (id) Sync.deleteKey('trade_' + id);
-    return next;
+    return this.getTrades();
   },
   clearLocalTrades() { localStorage.removeItem(KEYS.trades); },
 
@@ -973,14 +981,15 @@ export const Store = {
       ...HARDCODED_NOTE_IDS,
       ...read(KEYS.deletedNotes, []),
     ]);
-    return read(KEYS.notes, []).filter(n => n && n.id && !tombstones.has(n.id));
+    return read(KEYS.notes, []).filter(n => n && n.id && !tombstones.has(n.id)).map(hydrate);
   },
   saveNote(note) {
     const notes = read(KEYS.notes, []);
+    const stored = dehydrate(note); // move inline block images → IndexedDB
     const idx = notes.findIndex(n => n.id === note.id);
-    if (idx >= 0) notes[idx] = note; else notes.unshift(note);
+    if (idx >= 0) notes[idx] = stored; else notes.unshift(stored);
     localStorage.setItem(KEYS.notes, JSON.stringify(notes));
-    Sync.push('note_' + note.id, note);
+    Sync.push('note_' + note.id, note); // push full images — unchanged
     return this.getNotes();
   },
   deleteNote(id) {
@@ -1008,7 +1017,26 @@ export const Store = {
   // Wipe local cache when a different user signs in, so we don't leak data.
   resetLocal() {
     Object.values(KEYS).forEach(k => localStorage.removeItem(k));
+    clearImageCache();
   },
+
+  // Boot: open the IndexedDB image cache, then migrate any screenshots still
+  // stored inline in localStorage out into IndexedDB. Idempotent — once trades
+  // hold idb: refs, re-running is a cheap no-op. This is what removes the old
+  // ~5MB localStorage ceiling so any number of trades + screenshots can be kept.
+  async initStorage() {
+    await initImageCache();
+    try {
+      localStorage.setItem(KEYS.trades, JSON.stringify(read(KEYS.trades, []).map(dehydrate)));
+      localStorage.setItem(KEYS.notes, JSON.stringify(read(KEYS.notes, []).map(dehydrate)));
+      await flushImageWrites();
+    } catch (e) {
+      console.warn('[store] image migration skipped:', e?.message);
+    }
+  },
+
+  // Flush queued IndexedDB image writes — wired to the unload handler.
+  flushImages() { return flushImageWrites(); },
 
   // Compress an image file to a JPEG data URL. If the browser can't
   // decode the file into an <img> (HEIC, weird format) we fall back to

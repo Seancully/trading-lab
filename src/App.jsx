@@ -608,7 +608,7 @@ export default function App() {
     // Flush any debounced sync writes when the tab is closing or backgrounded
     // so we don't drop a pending change. visibilitychange covers mobile + tab
     // switches; beforeunload covers desktop close/refresh.
-    const flush = () => { Sync.flushAll?.(); };
+    const flush = () => { Sync.flushAll?.(); Store.flushImages?.(); };
     const onVisibility = () => { if (document.visibilityState === 'hidden') flush(); };
     window.addEventListener('beforeunload', flush);
     document.addEventListener('visibilitychange', onVisibility);
@@ -622,6 +622,9 @@ export default function App() {
   // Boot: check session
   useEffect(() => {
     (async () => {
+      // Open the IndexedDB image cache + migrate any inline screenshots out of
+      // localStorage before the UI reads trades. Removes the old ~5MB ceiling.
+      await Store.initStorage();
       if (!supabaseConfigured) {
         setAuthState('ready');
         return;
